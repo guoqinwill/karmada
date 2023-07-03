@@ -1,6 +1,8 @@
 name: FOSSA
 on:
   push:
+    branches:
+      - master
 jobs:
   fossa:
     name: FOSSA
