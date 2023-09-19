@@ -9,50 +9,48 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
 	"k8s.io/klog/v2"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/karmada-io/karmada/pkg/util"
 )
 
-var hpaPredicate = predicate.Funcs{
-	CreateFunc: func(e event.CreateEvent) bool {
-		return false
-	},
-	UpdateFunc: func(e event.UpdateEvent) bool {
-		oldHPA, ok := e.ObjectOld.(*autoscalingv2.HorizontalPodAutoscaler)
-		if !ok {
-			return false
-		}
-
-		newHPA, ok := e.ObjectNew.(*autoscalingv2.HorizontalPodAutoscaler)
-		if !ok {
-			return false
-		}
-
-		return oldHPA.Status.CurrentReplicas != newHPA.Status.CurrentReplicas
-	},
-	DeleteFunc: func(e event.DeleteEvent) bool {
-		return false
-	},
-}
+const (
+	ControllerName    = "hpa-replicas-syncer"
+	scaleRefWorkerNum = 1
+)
 
 // HPAReplicasSyncer is to sync replicas from status of HPA to resource template.
 type HPAReplicasSyncer struct {
-	Client      client.Client
-	RESTMapper  meta.RESTMapper
-	ScaleClient scale.ScalesGetter
+	Client        client.Client
+	DynamicClient dynamic.Interface
+	RESTMapper    meta.RESTMapper
+
+	ScaleClient    scale.ScalesGetter
+	ScaleRefWorker util.AsyncWorker
 }
 
 // SetupWithManager creates a controller and register to controller manager.
 func (r *HPAReplicasSyncer) SetupWithManager(mgr controllerruntime.Manager) error {
-	return controllerruntime.NewControllerManagedBy(mgr).Named("replicas-syncer").
-		For(&autoscalingv2.HorizontalPodAutoscaler{}, builder.WithPredicates(hpaPredicate)).
+	scaleRefWorkerOptions := util.Options{
+		Name:          "scale ref worker",
+		ReconcileFunc: r.ReconcileScaleRef,
+	}
+	r.ScaleRefWorker = util.NewAsyncWorker(scaleRefWorkerOptions)
+	r.ScaleRefWorker.Run(scaleRefWorkerNum, context.Background().Done())
+
+	return controllerruntime.NewControllerManagedBy(mgr).
+		Named(ControllerName).
+		For(&autoscalingv2.HorizontalPodAutoscaler{}, builder.WithPredicates(r)).
 		Complete(r)
 }
+
+var _ reconcile.Reconciler = &HPAReplicasSyncer{}
 
 // Reconcile performs a full reconciliation for the object referred to by the Request.
 // The Controller will requeue the Request to be processed again if an error is non-nil or

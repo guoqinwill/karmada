@@ -3,6 +3,7 @@ package native
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -16,8 +17,11 @@ import (
 // retentionInterpreter is the function that retains values from "observed" object.
 type retentionInterpreter func(desired *unstructured.Unstructured, observed *unstructured.Unstructured) (retained *unstructured.Unstructured, err error)
 
+const deploymentControlByHPALabel = "horizontalpodautoscaler.karmada.io/name"
+
 func getAllDefaultRetentionInterpreter() map[schema.GroupVersionKind]retentionInterpreter {
 	s := make(map[schema.GroupVersionKind]retentionInterpreter)
+	s[appsv1.SchemeGroupVersion.WithKind(util.DeploymentKind)] = retainDeploymentFields
 	s[corev1.SchemeGroupVersion.WithKind(util.PodKind)] = retainPodFields
 	s[corev1.SchemeGroupVersion.WithKind(util.ServiceKind)] = lifted.RetainServiceFields
 	s[corev1.SchemeGroupVersion.WithKind(util.ServiceAccountKind)] = lifted.RetainServiceAccountFields
@@ -120,5 +124,25 @@ func retainJobSelectorFields(desired, observed *unstructured.Unstructured) (*uns
 			return nil, err
 		}
 	}
+	return desired, nil
+}
+
+func retainDeploymentFields(desired, observed *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	labels, exist, err := unstructured.NestedStringMap(desired.Object, "metadata", "labels")
+	if err != nil {
+		return nil, err
+	}
+
+	if _, hpaLabelExist := labels[deploymentControlByHPALabel]; exist && hpaLabelExist {
+		replicas, exist, err := unstructured.NestedInt64(observed.Object, "spec", "replicas")
+		if err != nil || !exist {
+			return nil, fmt.Errorf("failed to get spec.replicas from deployment %s/%s", observed.GetName(), observed.GetNamespace())
+		}
+		err = unstructured.SetNestedField(desired.Object, replicas, "spec", "replicas")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return desired, nil
 }
