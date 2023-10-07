@@ -116,6 +116,25 @@ jobs:
         # Please remember to update the CI Schedule Workflow when we add a new version.
         k8s: [ v1.25.0, v1.26.0, v1.27.3 ]
     steps:
+      # Clean unnecessary files to save disk space
+      - name: clean unncessary files to save space
+        run: |
+          df -hl
+          docker rmi `docker images -q`
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d
+          sudo apt -y autoremove --purge
+          sudo apt -y autoclean
+          sudo apt clean
+          rm --recursive --force "$AGENT_TOOLSDIRECTORY"
+          df -hl
+      # Free up disk space on Ubuntu
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # This might remove tools that are actually needed, if set to "true" but frees about 6 GB
+          tool-cache: true
+          large-packages: true
+          swap-storage: true
       - name: checkout code
         uses: actions/checkout@v3
         with:
