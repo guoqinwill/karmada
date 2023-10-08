@@ -117,16 +117,9 @@ jobs:
         k8s: [ v1.25.0, v1.26.0, v1.27.3 ]
     steps:
       # Clean unnecessary files to save disk space
-      - name: clean unncessary files to save space
+      - name: df
         run: |
-          df -hl
-          docker rmi `docker images -q`
-          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/sudo apt/sources.list.d
-          sudo apt -y autoremove --purge
-          sudo apt -y autoclean
-          sudo apt clean
-          rm --recursive --force "$AGENT_TOOLSDIRECTORY"
-          df -hl
+          df / -hl
       # Free up disk space on Ubuntu
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
