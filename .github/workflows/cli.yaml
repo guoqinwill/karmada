@@ -37,7 +37,7 @@ jobs:
           haskell: true
           large-packages: false
           docker-images: false
-          swap-storage: true
+          swap-storage: false
       - name: df
         run: |
           df / -hl
