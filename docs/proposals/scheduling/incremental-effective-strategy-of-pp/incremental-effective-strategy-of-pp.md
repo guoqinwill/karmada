@@ -233,11 +233,40 @@ karmadactl reconcile all -l clusterpropagationpolicy.karmada.io/name=policy-xx
 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
 一定程度上不符合 k8s 声明式 API 的理念。
 
+#### method 5.1
+
+是否可以容忍？
+
+个人认为可以容忍，理念是死的，不能因为附和一个理念而否认一个方案，还是要回归这个方案在具体场景中的合理性；这里 Policy
+增量生效在这个场景是合理的，k8s 中也能找到类似的例子，比如给一个节点打污点，节点已部署的污点不会受影响而被逐出，
+只会影响后续的分配，这也是一种增量生效的实践
+
+#### method 5.2
+
+让不合理的地方变得更合理、更有说服力
+
+Policy 命中资源模版，会在相应资源模版上加上如下 label：
+
+```yaml
+propagationpolicy.karmada.io/name: nginx-pp
+propagationpolicy.karmada.io/namespace: default
+```
+
+如果 Policy 是增量生效，我们可以考虑额外打上如下 label，代表当前资源模版是被 `generation=3` 版本的 Policy 命中，而不是被当前最新 Policy 命中：
+
+```yaml
+propagationpolicy.karmada.io/generation: 3
+```
+
 ***
 
 ### Risk 6
 
 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
+
+##### method 6.1
+
+同 [method 5.2](#method-52)，引入 `propagationpolicy.karmada.io/generation: 3` 就不是问题
 
 ***
 
