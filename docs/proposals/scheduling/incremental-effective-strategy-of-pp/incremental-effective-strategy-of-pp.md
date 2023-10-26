@@ -157,6 +157,19 @@ karmadactl reconcile all -l user=ucs
 如此一来，只要某个应用涉及的资源都有共同的 label，就可以一键刷新应用涉及的所有资源模板；只要这个用户下所有资源都有共同的 label，
 就可以一键刷新该用户下所有的资源模板
 
+
+#### method 1.3
+
+```console
+kubectl label deploy,svc,cm -l app=nginx --overwrite refresh-time=$(date +%s)
+```
+
+或者
+
+```console
+kubectl label $(kubectl api-resources --verbs=list --namespaced -o name | paste -sd ',') -l app=nginx --overwrite refresh-time=$(date +%s)
+```
+
 ***
 
 ### Risk 2
@@ -299,12 +312,4 @@ pp删除事件如何响应
 
 
 
-
-
-
-### API Modify
-
-none
-
-### Test Plan
 
