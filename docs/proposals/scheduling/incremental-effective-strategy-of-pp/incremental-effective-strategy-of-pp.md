@@ -164,12 +164,6 @@ karmadactl reconcile all -l user=ucs
 kubectl label deploy,svc,cm -l app=nginx --overwrite refresh-time=$(date +%s)
 ```
 
-或者
-
-```console
-kubectl label $(kubectl api-resources --verbs=list --namespaced -o name | paste -sd ',') -l app=nginx --overwrite refresh-time=$(date +%s)
-```
-
 ***
 
 ### Risk 2
