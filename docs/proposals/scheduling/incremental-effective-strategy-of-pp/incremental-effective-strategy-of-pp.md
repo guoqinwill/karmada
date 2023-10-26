@@ -197,6 +197,10 @@ karmadactl reconcile all -l user=ucs
 
 #### method 3.2
 
+Karmada 自己更新资源模版，触发资源模版 `Reconcile`，更新时附带一个类似 `updated-by=karmada` 这样的标签
+`Reconcile` 时判断是否有该标签， 没有该标签就是用户的修改，需要使新 Policy 生效；
+如果有该标签，就是 Karmada 的修改，不使新 Policy 生效，并在 `Reconcile` 结束删除该标签
+
 ***
 
 ### Risk 4
