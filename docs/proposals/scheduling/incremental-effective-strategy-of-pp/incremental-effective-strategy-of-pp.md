@@ -182,7 +182,7 @@ karmadactl reconcile all -l user=ucs
 
 #### method 2.2
 
-同上述 [method 2.2](#method-12)
+同上述 [method 1.2](#method-12)
 
 ### Risk 3
 
