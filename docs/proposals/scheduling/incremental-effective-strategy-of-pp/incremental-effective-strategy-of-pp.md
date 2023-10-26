@@ -120,7 +120,7 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ## Risks and Mitigations
 
-### 问题1
+### Risk 1
 
 风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。
 
@@ -132,7 +132,34 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ![](./images/image1.png)
 
-### 问题2
+### Mitigations 1
+
+#### method 1.1
+
+启用增量生效策略时，建议开启依赖跟随分发能力：
+* 在 controller 中启用 `--feature-gates=PropagateDeps=true`，默认即开启
+* 在相应 PropagationPolicy 中配置 `spec.propagateDeps=true`
+
+这样，当 deployment 依赖了 secret，当 deployment 分发时也会带上相应的依赖的资源一起分发
+
+局限性：只有 deployment 等资源模版中显示声明的依赖的资源可以自动跟随分发，具体应用程序在代码里隐式依赖的资源做不到跟随分发，
+这一点是否可以容忍？
+
+#### method 1.2
+
+为什么用户不能将自己的应用一起全部更新一下？上述例子中根本问题在于，用户只想改 deployment，别的没打算改，而你不改的话，即便重新 apply，
+资源模版 unchanged，也不会重新 `Reconcile`。那既然 `kubectl apply` 做不到这一点，我们是否可以考虑在 karmadactl 中 添加一个
+`karmadactl reconcile` 的能力，不变更资源模版，只是触发筛选到的资源强制 `Reconcile`，例如：
+
+```console
+karmadactl reconcile secrets -l app=nginx
+karmadactl reconcile all -l user=ucs
+```
+
+如此一来，只要某个应用涉及的资源都有共同的 label，就可以一键刷新应用涉及的所有资源模板；只要这个用户下所有资源都有共同的 label，
+就可以一键刷新该用户下所有的资源模板
+
+### Risk 2
 
 和问题1类似，假设开启增量生效的新 Policy 会将命中的资源缩减集群，而 deployment 使用了某个 secret
 
@@ -142,26 +169,48 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ![](./images/image2.png)
 
-### 问题3
+### Mitigations 2
+
+#### method 2.1
+
+依赖跟随分发可以解决 [Risk 1](#risk-1), 但不能解决此 Risk，因为 secret 属于被依赖的资源，资源模版里不能显示声明被谁依赖，依赖它的资源做不到跟随分发，
+其本质原因还是 [Mitigations 1](#mitigations-1) 里所描述的局限性，这一点是否可以容忍？
+
+个人认为可以容忍，这个问题还是要回到场景中，如果是个别用户或者个别应用需要缩集群，那其实集群管理员不会去改全局 Policy 去缩集群 (此时应使用用户定制的 Policy 去抢占原全局 Policy)，
+改全局 Policy 一定是所有用户所有应用都想摘除某个集群，Policy 中期望的状态就是整个集群被干掉，只是这个期望的状态被延迟生效了，
+那么这个过程中该集群难免出现脏状态；但既然这个集群是期望被干掉的，那该集群中负载的健康状态自然相对不是那么被关注的。
+
+#### method 2.2
+
+同上述 [method 2.2](#method-22)
+
+### Risk 3
 
 已经分发成功的资源模板在修改后才会生效，然而 Karmada 自己也会修改资源模版，例如添加 label、更新 status 字段
 
 然而期望的结果是：用户修改后才应该生效、Karmada自己修改后不应该生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
 
-### 问题4
+### Mitigations 3
+
+### Risk 4
 
 用户可能会在全量策略、增量策略两种方式中来回切换，例如用户希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
 本方案的操作方式对用户是否友好？
 
-### 问题5
+### Mitigations 4
+
+### Risk 5
 
 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
 一定程度上不符合 k8s 声明式 API 的理念。
 
-### 问题6
+### Mitigations 5
+
+### Risk 6
 
 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
 
+### Mitigations 6
 
 ## Design Details
 
