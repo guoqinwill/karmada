@@ -10,7 +10,7 @@ approvers:
 creation-date: 2023-10-23
 ---
 
-# PropagationPolicy 支持增量生效策略
+# 如何降低变更庞大 PropagationPolicy 时的风险
 
 ## Summary
 
@@ -68,6 +68,7 @@ deployment 已成功生效且结果符合预期，再使下一个命中的 deplo
 
 缺点：
 * 实现难度较大
+* 无法对各个用户部署的应用的生效顺序做先后排序，每个用户都觉得自己的应用更重要，应该后生效
 * 履行新的 ClusterPropagationPolicy 需要很长时间
 * 万一某个用户的 deployment 失败了，集群管理员可能还是无法应对 (或者我们还需提供回滚能力)
 
@@ -82,7 +83,9 @@ deployment 已成功生效且结果符合预期，再使下一个命中的 deplo
 优点：如果上述普通用户也熟练使用 Karmada，并愿意编写及维护为自己的应用定制化的 PropagationPolicy，则使用新的细粒度的
 PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种好的实践
 
-缺点：但在本案例中，普通用户不维护 PropagationPolicy，而集群管理员不感知普通用户的具体资源，因此不可行
+缺点：但在本案例中，普通用户不维护 PropagationPolicy，而集群管理员不感知普通用户的具体资源，目前不可行
+
+总评：该方案在另一个需求中也在同步探索，如果用户能接受定制自己的 Policy，也可以用于解决本文集群管理员的根本诉求
 
 ### Method Four
 
@@ -103,12 +106,15 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 缺点：
 
-* 风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。例如普通用户只是想在某 deployment 中加个
+#### 缺点1
+
+风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。例如普通用户只是想在某 deployment 中加个
   label，由于修改了 deployment 导致更新后的 Policy 生效，该 deployment 可能扩容到新的集群，但该 deployment 使用了某个 secret，
   而该 secret 没有修改 (没有修改新 Policy 就不会生效)，因此新的集群没有该 secret，那么新集群的相应负载可能直接失败，一定程度上影响
-  了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)。
+  了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)。 
+2. 和问题1类似，
 * 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
-  一定程度上不符合 k8s 声明式 API 的理念，
+  一定程度上不符合 k8s 声明式 API 的理念。
 * 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
 
 总评：总体可行，对于集群管理员的诉求，是最契合的方案
