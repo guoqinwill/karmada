@@ -132,8 +132,6 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ![](./images/image1.png)
 
-### Mitigations 1
-
 #### method 1.1
 
 启用增量生效策略时，建议开启依赖跟随分发能力：
@@ -169,8 +167,6 @@ karmadactl reconcile all -l user=ucs
 
 ![](./images/image2.png)
 
-### Mitigations 2
-
 #### method 2.1
 
 依赖跟随分发可以解决 [Risk 1](#risk-1), 但不能解决此 Risk，因为 secret 属于被依赖的资源，资源模版里不能显示声明被谁依赖，依赖它的资源做不到跟随分发，
@@ -190,16 +186,12 @@ karmadactl reconcile all -l user=ucs
 >
 > 然而期望的结果是：用户修改后才应该生效、Karmada自己修改后不应该生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
 
-### Mitigations 3
-
 #### method 3.1
 
 白名单方式，虽然我们不知道用户会修改啥，但是 Karmada 自己会修改哪些字段我们是知道的，所以对 Karmada 自己会修改的字段列举一个白名单，
 是 Karmada 自己修改的就不让新 Policy 生效
 
 #### method 3.2
-
-
 
 ### Risk 4
 
@@ -224,20 +216,14 @@ karmadactl reconcile all -l user=ucs
 karmadactl reconcile all -l clusterpropagationpolicy.karmada.io/name=policy-xx
 ```
 
-### Mitigations 4
-
 ### Risk 5
 
 > 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
 一定程度上不符合 k8s 声明式 API 的理念。
 
-### Mitigations 5
-
 ### Risk 6
 
 > 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
-
-### Mitigations 6
 
 ## Design Details
 
