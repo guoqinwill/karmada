@@ -130,6 +130,8 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 那么新集群的相应负载可能直接失败，一定程度上影响 了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)
 
+![](./images/image1.png)
+
 ### 问题2
 
 和问题1类似，假设开启增量生效的新 Policy 会将命中的资源缩减集群，而 deployment 使用了某个 secret
@@ -137,6 +139,8 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 如果用户只更新了该 secret，新 policy 对 secret 生效，计划被缩减的集群上的 secret 会被删掉
 
 但是由于 deployment 没更新，新 Policy 不会 对 deployment 生效，计划被缩减的集群上的 deployment 还在，但它可能因为找不到所需的 secret 导致运行异常
+
+![](./images/image2.png)
 
 ### 问题3
 
