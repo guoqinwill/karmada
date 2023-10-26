@@ -1,5 +1,5 @@
 ---
-title: PropagationPolicy 支持增量生效策略
+title: 如何降低变更庞大 PropagationPolicy 时的风险
 authors:
 - "@chaosi-zju"
 reviewers:
@@ -107,7 +107,7 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 * 只是在原有 ClusterPropagationPolicy 上新增可选字段，只要不开启这个字段，对 Karmada 的行为来说就没有变化； 
   这一点也给升级时的兼容性减轻负担
 
-缺点：详见下文[可行性分析](#可行性分析)
+缺点：详见下文 [Risks and Mitigations](#Risks-and-Mitigations)
 
 总评：总体可行，对于集群管理员的诉求，是最契合的方案
 
@@ -118,11 +118,9 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 * 值为 `all`: 全量生效策略，默认值，修改本 Policy 对命中的资源模版立即全量生效
 * 值为 `incremental`：增量生效策略，修改本 Policy 对命中的资源模版增量生效
 
-## Design Details
+## Risks and Mitigations
 
-### 可行性分析
-
-#### 问题1
+### 问题1
 
 风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。
 
@@ -132,7 +130,7 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 那么新集群的相应负载可能直接失败，一定程度上影响 了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)
 
-#### 问题2
+### 问题2
 
 和问题1类似，假设开启增量生效的新 Policy 会将命中的资源缩减集群，而 deployment 使用了某个 secret
 
@@ -140,26 +138,28 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 但是由于 deployment 没更新，新 Policy 不会 对 deployment 生效，计划被缩减的集群上的 deployment 还在，但它可能因为找不到所需的 secret 导致运行异常
 
-#### 问题3
+### 问题3
 
 已经分发成功的资源模板在修改后才会生效，然而 Karmada 自己也会修改资源模版，例如添加 label、更新 status 字段
 
 然而期望的结果是：用户修改后才应该生效、Karmada自己修改后不应该生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
 
-#### 问题4
+### 问题4
 
 用户可能会在全量策略、增量策略两种方式中来回切换，例如用户希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
 本方案的操作方式对用户是否友好？
 
-#### 问题5
+### 问题5
 
 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
 一定程度上不符合 k8s 声明式 API 的理念。
 
-#### 问题6
+### 问题6
 
 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
 
+
+## Design Details
 
 ### Detector for Policy
 
