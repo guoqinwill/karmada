@@ -122,13 +122,15 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ### Risk 1
 
-> 风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。
->
-> 例如普通用户只是想在某 deployment 中加个 label，由于修改了 deployment 导致更新后的 Policy 生效，该 deployment 可能扩容到新的集群
->
-> 但该 deployment 使用了某个 secret， 而该 secret 没有修改 (没有修改新 Policy 就不会生效)，因此新的集群没有该 secret
->
-> 那么新集群的相应负载可能直接失败，一定程度上影响 了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)
+```console
+风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。
+
+例如普通用户只是想在某 deployment 中加个 label，由于修改了 deployment 导致更新后的 Policy 生效，该 deployment 可能扩容到新的集群
+
+但该 deployment 使用了某个 secret， 而该 secret 没有修改 (没有修改新 Policy 就不会生效)，因此新的集群没有该 secret
+
+那么新集群的相应负载可能直接失败，一定程度上影响 了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)
+```
 
 ![](./images/image1.png)
 
@@ -170,7 +172,7 @@ karmadactl reconcile all -l user=ucs
 #### method 2.1
 
 依赖跟随分发可以解决 [Risk 1](#risk-1), 但不能解决此 Risk，因为 secret 属于被依赖的资源，资源模版里不能显示声明被谁依赖，依赖它的资源做不到跟随分发，
-其本质原因还是 [Mitigations 1](#mitigations-1) 里所描述的局限性，这一点是否可以容忍？
+其本质原因还是 [method 1.1](#method-11) 里所描述的局限性，这一点是否可以容忍？
 
 个人认为可以容忍，这个问题还是要回到场景中，如果是个别用户或者个别应用需要缩集群，那其实集群管理员不会去改全局 Policy 去缩集群 (此时应使用用户定制的 Policy 去抢占原全局 Policy)，
 改全局 Policy 一定是所有用户所有应用都想摘除某个集群，Policy 中期望的状态就是整个集群被干掉，只是这个期望的状态被延迟生效了，
@@ -184,7 +186,7 @@ karmadactl reconcile all -l user=ucs
 
 > 已经分发成功的资源模板在修改后才会生效，然而 Karmada 自己也会修改资源模版，例如添加 label、更新 status 字段
 >
-> 然而期望的结果是：用户修改后才应该生效、Karmada自己修改后不应该生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
+> 然而期望的结果是：用户修改后才应生效、Karmada自己修改后不应生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
 
 #### method 3.1
 
