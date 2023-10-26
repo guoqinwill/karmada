@@ -122,7 +122,6 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 
 ### Risk 1
 
-```console
 风险本质上没有凭空消失，只是从集群管理员转移到各个普通用户上，对普通用户可能不是很友好。
 
 例如普通用户只是想在某 deployment 中加个 label，由于修改了 deployment 导致更新后的 Policy 生效，该 deployment 可能扩容到新的集群
@@ -130,7 +129,6 @@ PropagationPolicy 去抢占原全局 ClusterPropagationPolicy，不失为一种�
 但该 deployment 使用了某个 secret， 而该 secret 没有修改 (没有修改新 Policy 就不会生效)，因此新的集群没有该 secret
 
 那么新集群的相应负载可能直接失败，一定程度上影响 了用户的使用体验 (用户只想给 deployment 加个 label, 不想理解后面一串牵扯的逻辑)
-```
 
 ![](./images/image1.png)
 
@@ -159,13 +157,15 @@ karmadactl reconcile all -l user=ucs
 如此一来，只要某个应用涉及的资源都有共同的 label，就可以一键刷新应用涉及的所有资源模板；只要这个用户下所有资源都有共同的 label，
 就可以一键刷新该用户下所有的资源模板
 
+***
+
 ### Risk 2
 
-> 和问题1类似，假设开启增量生效的新 Policy 会将命中的资源缩减集群，而 deployment 使用了某个 secret
->
-> 如果用户只更新了该 secret，新 policy 对 secret 生效，计划被缩减的集群上的 secret 会被删掉
->
-> 但是由于 deployment 没更新，新 Policy 不会 对 deployment 生效，计划被缩减的集群上的 deployment 还在，但它可能因为找不到所需的 secret 导致运行异常
+和问题1类似，假设开启增量生效的新 Policy 会将命中的资源缩减集群，而 deployment 使用了某个 secret
+
+如果用户只更新了该 secret，新 policy 对 secret 生效，计划被缩减的集群上的 secret 会被删掉
+
+但是由于 deployment 没更新，新 Policy 不会 对 deployment 生效，计划被缩减的集群上的 deployment 还在，但它可能因为找不到所需的 secret 导致运行异常
 
 ![](./images/image2.png)
 
@@ -182,11 +182,13 @@ karmadactl reconcile all -l user=ucs
 
 同上述 [method 1.2](#method-12)
 
+***
+
 ### Risk 3
 
-> 已经分发成功的资源模板在修改后才会生效，然而 Karmada 自己也会修改资源模版，例如添加 label、更新 status 字段
->
-> 然而期望的结果是：用户修改后才应生效、Karmada自己修改后不应生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
+已经分发成功的资源模板在修改后才会生效，然而 Karmada 自己也会修改资源模版，例如添加 label、更新 status 字段
+
+然而期望的结果是：用户修改后才应生效、Karmada自己修改后不应生效，那么如何区分资源模版是被用户修改还是 Karmada 自己修改
 
 #### method 3.1
 
@@ -195,9 +197,11 @@ karmadactl reconcile all -l user=ucs
 
 #### method 3.2
 
+***
+
 ### Risk 4
 
-> 集群管理员可能会在全量策略、增量策略两种方式中来回切换，例如集群管理员希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
+集群管理员可能会在全量策略、增量策略两种方式中来回切换，例如集群管理员希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
 本方案的操作方式对集群管理员是否友好？
 
 #### method 4.1
@@ -218,14 +222,20 @@ karmadactl reconcile all -l user=ucs
 karmadactl reconcile all -l clusterpropagationpolicy.karmada.io/name=policy-xx
 ```
 
+***
+
 ### Risk 5
 
-> 当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
+当前资源模版的分发结果，会出现与当前 Policy 声明的分发策略不一致的情况，因为该资源模版可能命中的是上个版本甚至上上个版本的 Policy，
 一定程度上不符合 k8s 声明式 API 的理念。
+
+***
 
 ### Risk 6
 
-> 当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
+当定位问题时也容易引起误导，如何区分是新的 Policy 写错了没命中导致没生效还是因为增量生效策略暂时没生效。
+
+***
 
 ## Design Details
 
