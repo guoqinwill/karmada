@@ -192,10 +192,37 @@ karmadactl reconcile all -l user=ucs
 
 ### Mitigations 3
 
+#### method 3.1
+
+白名单方式，虽然我们不知道用户会修改啥，但是 Karmada 自己会修改哪些字段我们是知道的，所以对 Karmada 自己会修改的字段列举一个白名单，
+是 Karmada 自己修改的就不让新 Policy 生效
+
+#### method 3.2
+
+
+
 ### Risk 4
 
-用户可能会在全量策略、增量策略两种方式中来回切换，例如用户希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
-本方案的操作方式对用户是否友好？
+集群管理员可能会在全量策略、增量策略两种方式中来回切换，例如集群管理员希望默认是增量生效，但某一次修改希望直接全量生效，而这一次改完后又变回增量生效，
+本方案的操作方式对集群管理员是否友好？
+
+#### method 4.1
+
+本 proposal 期望的是 Policy 默认全量生效，即不配新增的这个 label时，与以前 Karmada 的行为保持不变
+
+那么 [Risk 4](#risk-4) 中集群管理员具体操作就是：编写全局的 Policy 时添加 label `effect-strategy=incremental`，
+如果某次修改希望直接全量生效，就在修改的基础上把 label 也改成 `effect-strategy=all`，改完后又想变回增量生效，
+就在把 label 改回来
+
+#### method 4.2
+
+参考 [method 1.2](#method-12)，被全局 ClusterPropagationPolicy (假设名为 policy-xx ) 命中的资源模板一定有 label `clusterpropagationpolicy.karmada.io/name=policy-xx`
+
+因此，集群管理员直接将该 Policy 配置成增量生效，如果某次需要全量生效，直接执行：
+
+```console
+karmadactl reconcile all -l clusterpropagationpolicy.karmada.io/name=policy-xx
+```
 
 ### Mitigations 4
 
