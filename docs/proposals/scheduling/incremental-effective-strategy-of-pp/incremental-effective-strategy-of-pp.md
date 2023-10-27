@@ -305,14 +305,21 @@ propagationpolicy.karmada.io/generation: 3
   * 增量生效：同全量生效
 * Policy 开启了抢占
   * 全量生效：立即执行抢占逻辑
-  * 增量生效：
+  * 增量生效：// TODO
 
 pp更新时会判断已命中的资源是否不再被命中，如果是，会清除资源上的label，那么，当 pp 不再立即生效时，什么时机由谁去执行这个清除label的操作
 
-
 2）当 Detector 监听到 PropagationPolicy/ClusterPropagationPolicy 的删除事件，
 
-pp删除事件如何响应
+立即删除，逻辑保持不变
+
+### Scheduler
+
+调度器重启时，会比较 Binding 中的注解 `policy.karmada.io/applied-placement` 的内容与当前 Policy 中描述的分发策略是否一致，
+如果不一致，会依据当前 Policy 重新生成 Binding，即调度器一旦重启就会导致所有资源模版被新的 Policy 立即生效。
+
+因此，需要让调度器感知 Binding 使用的是旧版本的 Policy 并作出相应处理
+
 
 
 
