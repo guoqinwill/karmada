@@ -160,9 +160,20 @@ karmadactl reconcile all -l user=ucs
 
 #### method 1.3
 
+在上一个 method 的基础上，如果用户不愿使用 karmadactl，那只能直接借助 kubectl 实现批量刷新资源的能力，例如 `kubectl label --selector`：
+
 ```console
 kubectl label deploy,svc,cm -l app=nginx --overwrite refresh-time=$(date +%s)
 ```
+
+或者
+
+```console
+kubectl label $(kubectl api-resources --verbs=list --namespaced -o name | paste -sd ',') -l app=nginx --overwrite refresh-time=$(date +%s)
+```
+
+总评：集群管理员扩缩集群毕竟是一件重大的事，肯定会知会用户并告知相应策略是在用户更新资源时才会生效，我们建议管理员开启依赖跟随分发能力，
+但万一用户更新部分资源时真的出现在新增/缩减集群上依赖不全的问题，我们提供 `karmadactl reconcile` 或 `kubectl label` 等手段强制用户的所有生效
 
 ***
 
