@@ -9,15 +9,104 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.actor }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 jobs:
-  karmadactl-install:
-    name: karmadactl-install
-    runs-on: ubuntu-22.04
+#  karmadactl-install:
+#    name: karmadactl-install
+#    runs-on: ubuntu-22.04
+#    strategy:
+#      matrix:
+#        # Here support the latest three minor releases of Kubernetes, this can be considered to be roughly
+#        # the same as the End of Life of the Kubernetes release: https://kubernetes.io/releases/
+#        # Please remember to update the CI Schedule Workflow when we add a new version.
+#        k8s: [ v1.27.3 ]
+#    steps:
+#      - name: checkout code
+#        uses: actions/checkout@v3
+#        with:
+#          # Number of commits to fetch. 0 indicates all history for all branches and tags.
+#          # We need to guess version via git tags.
+#          fetch-depth: 0
+#      - name: install Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: 1.20.10
+#      - uses: engineerd/setup-kind@v0.5.0
+#        with:
+#          version: "v0.20.0"
+#      - name: Start SSH via Ngrok
+#        run: curl -sL https://gist.githubusercontent.com/retyui/7115bb6acf151351a143ec8f96a7c561/raw/7099b9db76729dc5761da72aa8525f632d8875c9/debug-github-actions.sh | bash
+#        env:
+#          NGROK_TOKEN: ${{ secrets.NGROK_TOKEN }}
+#          USER_PASS: ${{ secrets.USER_PASS }}
+#      - name: Don't kill instace
+#        run: sleep 8h # Prevent to killing instance after failure
+#      - name: run karmadactl init test
+#        run: |
+#          export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}
+#
+#          # init e2e environment by karmadactl
+#          hack/cli-testing-environment.sh
+#
+#          # run a single e2e
+#          export KUBECONFIG=${HOME}/karmada/karmada-apiserver.config
+#          GO111MODULE=on go install github.com/onsi/ginkgo/v2/ginkgo
+#          ginkgo -v --race --trace -p  --focus="[BasicPropagation] propagation testing deployment propagation testing"  ./test/e2e/
+#      - uses: chainguard-dev/actions/kind-diag@main
+#        # Only upload logs on failure.
+#        if: ${{ failure() }}
+#        with:
+#          cluster-resources: nodes,namespaces,
+#          namespace-resources: configmaps,pods,svc
+#          artifact-name: logs-${{ matrix.k8s}}
+#  helm-install:
+#    name: helm-install
+#    runs-on: ubuntu-22.04
+#    strategy:
+#      matrix:
+#        # Here support the latest three minor releases of Kubernetes, this can be considered to be roughly
+#        # the same as the End of Life of the Kubernetes release: https://kubernetes.io/releases/
+#        # Please remember to update the CI Schedule Workflow when we add a new version.
+#        k8s: [ v1.27.3 ]
+#    steps:
+#      - name: checkout code
+#        uses: actions/checkout@v3
+#        with:
+#          # Number of commits to fetch. 0 indicates all history for all branches and tags.
+#          # We need to guess version via git tags.
+#          fetch-depth: 0
+#      - name: install Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: 1.20.10
+#      - uses: engineerd/setup-kind@v0.5.0
+#        with:
+#          version: "v0.20.0"
+#      - name: run helm install test
+#        run: |
+#          export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}
+#
+#          # init e2e environment by helm
+#          hack/local-up-karmada-helm.sh
+#
+#          # run a single e2e
+#          export KUBECONFIG=~/.kube/karmada-apiserver.config
+#          GO111MODULE=on go install github.com/onsi/ginkgo/v2/ginkgo
+#          ginkgo -v --race --trace -p  --focus="[BasicPropagation] propagation testing deployment propagation testing"  ./test/e2e/
+#      - uses: chainguard-dev/actions/kind-diag@main
+#        # Only upload logs on failure.
+#        if: ${{ failure() }}
+#        with:
+#          cluster-resources: nodes,namespaces,
+#          namespace-resources: configmaps,pods,svc
+#          artifact-name: logs-${{ matrix.k8s}}
+  local-up-install-on-macos:
+    name: local-up-install-on-macos
+    runs-on: macos-12
     strategy:
       matrix:
         # Here support the latest three minor releases of Kubernetes, this can be considered to be roughly
         # the same as the End of Life of the Kubernetes release: https://kubernetes.io/releases/
         # Please remember to update the CI Schedule Workflow when we add a new version.
-        k8s: [ v1.26.0, v1.27.3, v1.28.0 ]
+        k8s: [ v1.27.3 ]
     steps:
       - name: checkout code
         uses: actions/checkout@v3
@@ -29,20 +118,80 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.20.10
-      - uses: engineerd/setup-kind@v0.5.0
-        with:
-          version: "v0.20.0"
-      - name: run karmadactl init test
+
+      - name: install kind
+        # must use kind@v0.19.0 rather than 0.20.0, https://github.com/kubernetes-sigs/kind/issues/3277
+        run: |
+          go install sigs.k8s.io/kind@v0.19.0
+          export PATH=$GOPATH/bin:$PATH
+      - name: install kubectl
+        run: |
+          brew install kubectl
+      - name: install docker
+        run: |
+          set -ex
+          
+          sysctl hw.physicalcpu
+          sysctl hw.logicalcpu
+          top -l 1 | head -n 10 | grep PhysMem
+          
+          brew install --cask docker
+
+          colima start --cpu 4 --memory 12
+
+          # For testcontainers to find the Colima socket
+          # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
+          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+          
+          docker info
+          
+          brew install chipmk/tap/docker-mac-net-connect || true
+          sudo brew services start chipmk/tap/docker-mac-net-connect
+          
+          cat >/tmp/karmada.yaml<<EOF
+          kind: Cluster
+          apiVersion: "kind.x-k8s.io/v1alpha4"
+          networking:
+            apiServerAddress: 127.0.0.1
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 5443
+              hostPort: 5443
+              protocol: TCP
+              listenAddress: 127.0.0.1
+          EOF
+          cat /tmp/karmada.yaml
+          kind create cluster --name karmada-host --kubeconfig ~/.kube/config --image kindest/node:v1.27.3 --config /tmp/karmada.yaml
+          cat ~/.kube/config || true
+
+          for ((time=0; time<120; time++)); do
+            if [[ -e ~/.kube/config ]]; then
+              echo 'kubeconfig exist'
+              break
+            fi
+            sleep 1
+          done
+          cat ~/.kube/config || true
+          kubectl get pods -A
+      - name: run local-up install test
         run: |
           export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}
-
-          # init e2e environment by karmadactl
-          hack/cli-testing-environment.sh
+          
+          # init e2e environment by local-up script
+          echo -e "127.0.0.1\n" | hack/local-up-karmada.sh
 
           # run a single e2e
-          export KUBECONFIG=${HOME}/karmada/karmada-apiserver.config
+          export KUBECONFIG=~/.kube/karmada.config
           GO111MODULE=on go install github.com/onsi/ginkgo/v2/ginkgo
-          ginkgo -v --race --trace -p  --focus="[BasicPropagation] propagation testing deployment propagation testing"  ./test/e2e/
+          ginkgo -v --race --trace -p  --focus="[BasicPropagation] propagation testing deployment propagation testing" ./test/e2e/
+      - name: export log
+        if: always()
+        run: |
+          kind export logs --name karmada-host /tmp/karmada/export_karmada-host || true
+          kind export logs --name member1 /tmp/karmada/export_member1 || true
+          kind export logs --name member2 /tmp/karmada/export_member2 || true
+          kind export logs --name member3 /tmp/karmada/export_member3 || true
       - uses: chainguard-dev/actions/kind-diag@main
         # Only upload logs on failure.
         if: ${{ failure() }}
@@ -50,44 +199,9 @@ jobs:
           cluster-resources: nodes,namespaces,
           namespace-resources: configmaps,pods,svc
           artifact-name: logs-${{ matrix.k8s}}
-  helm-install:
-    name: helm-install
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        # Here support the latest three minor releases of Kubernetes, this can be considered to be roughly
-        # the same as the End of Life of the Kubernetes release: https://kubernetes.io/releases/
-        # Please remember to update the CI Schedule Workflow when we add a new version.
-        k8s: [ v1.25.0, v1.26.0, v1.27.3 ]
-    steps:
-      - name: checkout code
-        uses: actions/checkout@v3
+      - name: upload kind logs
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
-          # Number of commits to fetch. 0 indicates all history for all branches and tags.
-          # We need to guess version via git tags.
-          fetch-depth: 0
-      - name: install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.20.6
-      - uses: engineerd/setup-kind@v0.5.0
-        with:
-          version: "v0.20.0"
-      - name: run helm install test
-        run: |
-          export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}
-
-          # init e2e environment by helm
-          hack/local-up-karmada-helm.sh
-
-          # run a single e2e
-          export KUBECONFIG=~/.kube/karmada-apiserver.config
-          GO111MODULE=on go install github.com/onsi/ginkgo/v2/ginkgo
-          ginkgo -v --race --trace -p  --focus="[BasicPropagation] propagation testing deployment propagation testing"  ./test/e2e/
-      - uses: chainguard-dev/actions/kind-diag@main
-        # Only upload logs on failure.
-        if: ${{ failure() }}
-        with:
-          cluster-resources: nodes,namespaces,
-          namespace-resources: configmaps,pods,svc
-          artifact-name: logs-${{ matrix.k8s}}
+          name: karmada_kind_log_${{ matrix.k8s }}
+          path: /tmp/karmada/

@@ -53,7 +53,7 @@ fi
 function rand() {
     min=$1
     max=$(($2-$min+1))
-    num=$(date +%s%N)
+    num=$(date +%s)
     echo $(($num%$max+$min))
 }
 
@@ -79,7 +79,8 @@ cp -rf "${REPO_ROOT}"/artifacts/kindClusterConfig/general-config.yaml "${TEMP_PA
 sed -i'' -e "s#{{pod_cidr}}#${POD_CIDR}#g" "${TEMP_PATH}"/"${CLUSTER_NAME}"-config.yaml
 sed -i'' -e "s#{{service_cidr}}#${SERVICE_CIDR}#g" "${TEMP_PATH}"/"${CLUSTER_NAME}"-config.yaml
 
-kind_log="$(mktemp --suffix=-kind.log)"
+mkdir -p /tmp/kind-log/
+kind_log="/tmp/kind-log/$(date +%s)" #$(mktemp /tmp/kind-log/XXXXXXXXXX)
 echo "Creating cluster \"${CLUSTER_NAME}\" ..."
 kind create cluster --name "${CLUSTER_NAME}" --kubeconfig="${KUBECONFIG}" --image="${CLUSTER_VERSION}" --config="${TEMP_PATH}"/"${CLUSTER_NAME}"-config.yaml > ${kind_log} 2>&1 || (
   echo "Creating cluster ${CLUSTER_NAME} failed, see detail log in ${kind_log}."

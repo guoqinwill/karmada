@@ -466,7 +466,7 @@ function util::create_cluster() {
   rm -rf "${log_path}/${cluster_name}.log"
   rm -f "${kubeconfig}"
 
-  nohup kind create cluster --name "${cluster_name}" --kubeconfig="${kubeconfig}" --image="${kind_image}" --config="${cluster_config}" >> "${log_path}"/"${cluster_name}".log 2>&1 &
+  nohup kind create cluster --name "${cluster_name}" --kubeconfig="${kubeconfig}" --image="${kind_image}" --config="${cluster_config}" --retain >> "${log_path}"/"${cluster_name}".log 2>&1 &
   echo "Creating cluster ${cluster_name} and the log file is in ${log_path}/${cluster_name}.log"
 }
 

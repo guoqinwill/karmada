@@ -33,7 +33,7 @@ helm install karmada -n karmada-system \
         --kubeconfig ~/.kube/karmada-host.config \
         --create-namespace \
         --dependency-update \
-        --set apiServer.hostNetwork=true,components={"search,descheduler"} \
+        --set apiServer.hostNetwork=true,components={"search,descheduler,schedulerEstimator"} \
         ./charts/karmada
 
 # 5. export kubeconfig of karmada-apiserver to local path
@@ -46,10 +46,8 @@ hack/create-cluster.sh member1 ~/.kube/members.config
 hack/create-cluster.sh member2 ~/.kube/members.config
 hack/create-cluster.sh member3 ~/.kube/members.config
 
-# 7. download karmadactl if not exist
-if ! which karmadactl >/dev/null 2>&1; then
-  curl -s https://raw.githubusercontent.com/karmada-io/karmada/master/hack/install-cli.sh | sudo bash
-fi
+# 7. make karmadactl binary
+make karmadactl
 
 # 8. join member1、member3 to karmada with push mode
 karmadactl join member1 --kubeconfig ~/.kube/karmada-apiserver.config --karmada-context karmada-apiserver --cluster-kubeconfig ~/.kube/members.config --cluster-context member1
