@@ -137,7 +137,9 @@ jobs:
           
           brew install --cask docker
 
-          colima start --cpu 4 --memory 12
+          colima list || true
+          colima delete default || true
+          colima start --cpu 4 --memory 4 --disk 20
 
           # For testcontainers to find the Colima socket
           # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
@@ -145,35 +147,35 @@ jobs:
           
           docker info
           
-          brew install chipmk/tap/docker-mac-net-connect || true
-          sudo brew services start chipmk/tap/docker-mac-net-connect
+          #          brew install chipmk/tap/docker-mac-net-connect || true
+          #          sudo brew services start chipmk/tap/docker-mac-net-connect
           
-          cat >/tmp/karmada.yaml<<EOF
-          kind: Cluster
-          apiVersion: "kind.x-k8s.io/v1alpha4"
-          networking:
-            apiServerAddress: 127.0.0.1
-          nodes:
-          - role: control-plane
-            extraPortMappings:
-            - containerPort: 5443
-              hostPort: 5443
-              protocol: TCP
-              listenAddress: 127.0.0.1
-          EOF
-          cat /tmp/karmada.yaml
-          kind create cluster --name karmada-host --kubeconfig ~/.kube/config --image kindest/node:v1.27.3 --config /tmp/karmada.yaml
-          cat ~/.kube/config || true
-
-          for ((time=0; time<120; time++)); do
-            if [[ -e ~/.kube/config ]]; then
-              echo 'kubeconfig exist'
-              break
-            fi
-            sleep 1
-          done
-          cat ~/.kube/config || true
-          kubectl get pods -A
+          #          cat >/tmp/karmada.yaml<<EOF
+          #          kind: Cluster
+          #          apiVersion: "kind.x-k8s.io/v1alpha4"
+          #          networking:
+          #            apiServerAddress: 127.0.0.1
+          #          nodes:
+          #          - role: control-plane
+          #            extraPortMappings:
+          #            - containerPort: 5443
+          #              hostPort: 5443
+          #              protocol: TCP
+          #              listenAddress: 127.0.0.1
+          #          EOF
+          #          cat /tmp/karmada.yaml
+          #          kind create cluster --name karmada-host --kubeconfig ~/.kube/config --image kindest/node:v1.27.3 --config /tmp/karmada.yaml
+          #          cat ~/.kube/config || true
+          #
+          #          for ((time=0; time<120; time++)); do
+          #            if [[ -e ~/.kube/config ]]; then
+          #              echo 'kubeconfig exist'
+          #              break
+          #            fi
+          #            sleep 1
+          #          done
+          #          cat ~/.kube/config || true
+          #          kubectl get pods -A
       - name: run local-up install test
         run: |
           export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}
@@ -188,6 +190,14 @@ jobs:
       - name: export log
         if: always()
         run: |
+          docker ps -a > /tmp/karmada/docker_ps.log || true
+          docker exec -it karmada-host-control-plane ps -ef > /tmp/karmada/exec_ps.log || true
+          docker exec -it karmada-host-control-plane systemctl status kubelet > /tmp/karmada/my_kubelet_status.log || true
+          docker exec -it karmada-host-control-plane journalctl -xeu kubelet > /tmp/karmada/my_kubelet_journalctl.log || true
+          docker ps -a
+          docker exec -it karmada-host-control-plane ps -ef
+          docker exec -it karmada-host-control-plane systemctl status kubelet
+          docker exec -it karmada-host-control-plane journalctl -xeu kubelet
           kind export logs --name karmada-host /tmp/karmada/export_karmada-host || true
           kind export logs --name member1 /tmp/karmada/export_member1 || true
           kind export logs --name member2 /tmp/karmada/export_member2 || true
