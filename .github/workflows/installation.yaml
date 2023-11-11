@@ -120,9 +120,8 @@ jobs:
           go-version: 1.20.10
 
       - name: install kind
-        # must use kind@v0.19.0 rather than 0.20.0, https://github.com/kubernetes-sigs/kind/issues/3277
         run: |
-          go install sigs.k8s.io/kind@v0.19.0
+          go install sigs.k8s.io/kind@v0.20.0
           export PATH=$GOPATH/bin:$PATH
       - name: install kubectl
         run: |
@@ -131,51 +130,15 @@ jobs:
         run: |
           set -ex
           
-          sysctl hw.physicalcpu
-          sysctl hw.logicalcpu
-          top -l 1 | head -n 10 | grep PhysMem
-          
           brew install --cask docker
-
-          colima list || true
-          colima delete default || true
-          colima start --cpu 4 --memory 4 --disk 20
-
-          # For testcontainers to find the Colima socket
-          # https://github.com/abiosoft/colima/blob/main/docs/FAQ.md#cannot-connect-to-the-docker-daemon-at-unixvarrundockersock-is-the-docker-daemon-running
-          sudo ln -sf $HOME/.colima/default/docker.sock /var/run/docker.sock
+          brew install orbstack
+          orb || true
           
+          sleep 10
           docker info
           
           #          brew install chipmk/tap/docker-mac-net-connect || true
           #          sudo brew services start chipmk/tap/docker-mac-net-connect
-          
-          #          cat >/tmp/karmada.yaml<<EOF
-          #          kind: Cluster
-          #          apiVersion: "kind.x-k8s.io/v1alpha4"
-          #          networking:
-          #            apiServerAddress: 127.0.0.1
-          #          nodes:
-          #          - role: control-plane
-          #            extraPortMappings:
-          #            - containerPort: 5443
-          #              hostPort: 5443
-          #              protocol: TCP
-          #              listenAddress: 127.0.0.1
-          #          EOF
-          #          cat /tmp/karmada.yaml
-          #          kind create cluster --name karmada-host --kubeconfig ~/.kube/config --image kindest/node:v1.27.3 --config /tmp/karmada.yaml
-          #          cat ~/.kube/config || true
-          #
-          #          for ((time=0; time<120; time++)); do
-          #            if [[ -e ~/.kube/config ]]; then
-          #              echo 'kubeconfig exist'
-          #              break
-          #            fi
-          #            sleep 1
-          #          done
-          #          cat ~/.kube/config || true
-          #          kubectl get pods -A
       - name: run local-up install test
         run: |
           export CLUSTER_VERSION=kindest/node:${{ matrix.k8s }}

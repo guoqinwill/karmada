@@ -508,7 +508,7 @@ function util::check_clusters_ready() {
   case $os_name in
     linux) container_ip_port=$(util::get_docker_native_ipaddress "${context_name}-control-plane")":6443"
     ;;
-    darwin) container_ip_port=$(util::get_docker_host_ip_port "${context_name}-control-plane")
+    darwin) container_ip_port=$(util::get_docker_native_ipaddress "${context_name}-control-plane")":6443"
     ;;
     *)
         echo "OS ${os_name} does NOT support for getting container ip in installation script"
