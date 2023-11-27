@@ -407,6 +407,8 @@ var _ = ginkgo.Describe("[AdvancedClusterPropagation] propagation testing", func
 					},
 				}
 				framework.PatchClusterPropagationPolicy(karmadaClient, policy.Name, patch, types.JSONPatchType)
+				framework.AddAnnotationsToDeployment(kubeClient, deployment, map[string]string{reconcileAnnotationKey: time.Now().Format(time.RFC3339)})
+
 				gomega.Eventually(func() bool {
 					bindings, err := karmadaClient.WorkV1alpha2().ResourceBindings(testNamespace).List(context.TODO(), metav1.ListOptions{
 						LabelSelector: labels.SelectorFromSet(labels.Set{

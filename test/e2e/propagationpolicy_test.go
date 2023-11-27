@@ -1017,6 +1017,8 @@ var _ = ginkgo.Describe("[AdvancedPropagation] propagation testing", func() {
 				},
 			}
 			framework.PatchPropagationPolicy(karmadaClient, policy.Namespace, policy.Name, patch, types.JSONPatchType)
+			framework.AddAnnotationsToDeployment(kubeClient, deployment, map[string]string{reconcileAnnotationKey: time.Now().Format(time.RFC3339)})
+
 			gomega.Eventually(func() bool {
 				bindings, err := karmadaClient.WorkV1alpha2().ResourceBindings(testNamespace).List(context.TODO(), metav1.ListOptions{
 					LabelSelector: labels.SelectorFromSet(labels.Set{
@@ -1131,6 +1133,8 @@ var _ = ginkgo.Describe("[AdvancedPropagation] propagation testing", func() {
 			framework.RemovePropagationPolicy(karmadaClient, policy01.Namespace, policy01.Name)
 
 			framework.CreatePropagationPolicy(karmadaClient, policy02)
+			framework.AddAnnotationsToConfigMap(kubeClient, configmap, map[string]string{reconcileAnnotationKey: time.Now().Format(time.RFC3339)})
+
 			framework.WaitConfigMapDisappearOnCluster(member1, configmap.Namespace, configmap.Name)
 			framework.WaitConfigMapPresentOnClusterFitWith(member2, configmap.Namespace, configmap.Name,
 				func(configmap *corev1.ConfigMap) bool { return true })
