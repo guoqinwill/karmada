@@ -164,7 +164,7 @@ Karmada might also consider providing cluster administrators with the ability to
 #### Case 1
 
 1. create ResourceTemplate DeployA
-2. create PropagationPolicy Policy1 (match for DeployA)
+2. create PropagationPolicy Policy1 (match to DeployA)
 
 ```mermaid
 sequenceDiagram
@@ -185,7 +185,7 @@ sequenceDiagram
 
 #### Case 2
 
-1. create PropagationPolicy Policy1 (match for DeployA)
+1. create PropagationPolicy Policy1 (match to DeployA)
 2. create ResourceTemplate DeployA
 3. update Policy1
 4. update DeployA
@@ -218,9 +218,9 @@ sequenceDiagram
 
 #### Case 3
 
-1. create PropagationPolicy Policy1 (priority=1, match for DeployA)
+1. create PropagationPolicy Policy1 (priority=1, match to DeployA)
 2. create ResourceTemplate DeployA
-3. create Policy2 (priority=2, match for DeployA too)
+3. create Policy2 (priority=2, match to DeployA too)
 4. update DeployA
 
 ```mermaid
@@ -251,10 +251,10 @@ sequenceDiagram
 
 #### Case 4
 
-1. create PropagationPolicy Policy1 (priority=1, match for DeployA)
+1. create PropagationPolicy Policy1 (priority=1, match to DeployA)
 2. create ResourceTemplate DeployA
 3. update Policy1
-4. create Policy2 (priority=2, match for DeployA too)
+4. create Policy2 (priority=2, match to DeployA too)
 5. update DeployA
 
 ```mermaid
@@ -292,10 +292,10 @@ sequenceDiagram
 
 #### Case 5
 
-1. create PropagationPolicy Policy1 (priority=2, match for DeployA)
+1. create PropagationPolicy Policy1 (priority=2, match to DeployA)
 2. create ResourceTemplate DeployA
-3. create Policy2 (priority=1, match for DeployA too)
-4. delete Policy1
+3. create Policy2 (priority=1, match to DeployA too)
+4. update Policy1 (no longer match to DeployA)
 5. update DeployA
 
 ```mermaid
@@ -318,7 +318,7 @@ sequenceDiagram
   end
   deactivate Karmada
 
-  Policy1 ->> Karmada: delete
+  Policy1 ->> Karmada: update (no longer match to DeployA)
   activate Karmada
   loop
     Policy1 --> Karmada: no action util DeployA updated
@@ -328,16 +328,17 @@ sequenceDiagram
   DeployA ->> Karmada: update  
   activate Karmada
   Karmada -->> DeployA: propagate it by Policy1
+  
   deactivate Karmada
 ```
 
 #### Case 6
 
-1. create PropagationPolicy Policy1 (placement=member1, match for DeployA)
+1. create PropagationPolicy Policy1 (placement=member1, match to DeployA)
 2. create ResourceTemplate DeployA (replicas=2)
 3. delete Policy1
 4. update DeployA (change replicas from 2 to 5)
-5. create PropagationPolicy Policy2 (placement=member2, match for DeployA)
+5. create PropagationPolicy Policy2 (placement=member2, match to DeployA)
 
 ```mermaid
 sequenceDiagram
@@ -367,7 +368,7 @@ sequenceDiagram
 
   Policy2 ->> Karmada: create (placement=member2)
   activate Karmada
-  Karmada -->> DeployA: all 5 replicas propagated to member2 by Policy2
+  Karmada -->> DeployA: all 5 replicas propagated to member2 by Policy2 immediately
   deactivate Karmada
 ```
 
@@ -401,8 +402,9 @@ So how can you tell if a ResourceTemplate was modified by a user or by Karmada i
 
 Answers：
 
-* if the label is typed by Karmada itself, it should have Karmada's prefix, e.g. karmada.io.xxxx. Thus, such updates should be ignored.
-* updates of status field should be ignored.
+* If a modification only changes the label whose key contains the karmada-specific key prefix `.karmada.io`,
+  we regard it as modification of Karmada itself, and it should be ignored.
+* Updates of status field should be ignored.
 * Theoretically, we should not modify the user's ResourceTemplate, if there is a need to add something to it in the future, 
   there must be a way to clearly distinguish that this is a field modified by Karmada in the design stage. If you can't distinguish it, 
   you should choose other ways to realize it to avoid modifying the user's ResourceTemplate.
@@ -419,7 +421,7 @@ and that the distribution of user's ResourceTemplates is inert.
 
 Answers:
 
-In the future, a new `karmadactl` command could be added to support proactively triggering the reconciliation of all ResourceTemplates managed by a given policy.
+A new `karmadactl` command could be added to support proactively triggering the reconciliation of all ResourceTemplates managed by a given policy.
 
 Just like:
 ```shell
