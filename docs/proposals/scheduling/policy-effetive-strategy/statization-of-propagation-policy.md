@@ -14,8 +14,8 @@ creation-date: 2023-11-17
 
 ## Summary
 
-In this paper, We propose an improvement to the Policy enforcement mechanism, called Policy staticization.
-Before the introduction of this feature, modification of a Policy would immediately affect the resource templates it manages, 
+In this paper, we propose an improvement to the Policy enforcement mechanism, called Policy Staticization.
+Before the introduction of this feature, modification of a Policy would immediately affect the ResourceTemplate it manages, 
 potentially causing a huge shock to the system, which is too sensitive.
 
 We want Policy to be just some API-based static system strategies. Modification of the Policy should not actively cause changes to the system behavior, 
@@ -29,7 +29,7 @@ So, I propose to staticize the PropagationPolicy/ClusterPropagationPolicy as:
 * If the ResourceTemplate is already managed by a Policy, the distribution status of the Resource Template remains unchanged,
   regardless of whether the Policy has been modified or a higher-priority Policy applied.
 * When a user submits a change to a ResourceTemplate, if there is a matchable higher priority Policy in the system,
-  the ResourceTemplate will follow the Policy to adjust its distribution states; otherwise, if the previous matching Policy is modified,
+  the ResourceTemplate will follow that Policy to adjust its distribution states; otherwise, if the previous matching Policy is modified,
   the ResourceTemplate will also follow the modified Policy to adjust the distribution states.
 
 ## Motivation
@@ -41,7 +41,7 @@ there are two roles in this scenario:
   and is only responsible for deploying resources of their own application in a Namespace.
 * Cluster administrator: a person who is familiar with Karmada and is responsible for maintaining Karmada CRD resources such as ClusterPropagationPolicy.
 
-The cluster administrator does not know which users, which Namespaces, and which resources will be available in the future, 
+The cluster administrator does not know which users, which namespaces, and which resources will be available in the future, 
 so he creates a global default ClusterPropagationPolicy to manage all resource templates.
 
 As normal users come on board, many resources are already deployed in the cluster federation.
@@ -333,10 +333,10 @@ sequenceDiagram
 
 #### Case 6
 
-1. create PropagationPolicy Policy1
-2. create ResourceTemplate DeployA
+1. create PropagationPolicy Policy1 (placement=member1)
+2. create ResourceTemplate DeployA (replicas=2)
 3. delete Policy1
-4. update DeployA
+4. update DeployA (change replicas from 2 to 5)
 
 ```mermaid
 sequenceDiagram
@@ -344,10 +344,10 @@ sequenceDiagram
   participant Policy1
   participant Karmada
 
-  Policy1 ->> Karmada: create
+  Policy1 ->> Karmada: create (placement=member1)
   activate Karmada
-  DeployA ->> Karmada: create
-  Karmada -->> DeployA: propagate it by Policy1
+  DeployA ->> Karmada: create (replicas=2)
+  Karmada -->> DeployA: propagate it by Policy1 (member1)
   deactivate Karmada
   
   Policy1 ->> Karmada: delete
@@ -357,9 +357,10 @@ sequenceDiagram
   end
   deactivate Karmada
 
-  DeployA ->> Karmada: update  
+  DeployA ->> Karmada: update (change replicas from 2 to 5)
   activate Karmada
-  Karmada -->> DeployA: add to waiting list and delete existing replicas
+  Karmada -->> DeployA: add to waiting list for no matchable policy
+  Note over DeployA, Karmada: the existing 2 replicas unchanged, the additional 3 replicas pending
   deactivate Karmada
 ```
 
