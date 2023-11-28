@@ -333,21 +333,23 @@ sequenceDiagram
 
 #### Case 6
 
-1. create PropagationPolicy Policy1 (placement=member1)
+1. create PropagationPolicy Policy1 (placement=member1, match for DeployA)
 2. create ResourceTemplate DeployA (replicas=2)
 3. delete Policy1
 4. update DeployA (change replicas from 2 to 5)
+5. create PropagationPolicy Policy2 (placement=member2, match for DeployA)
 
 ```mermaid
 sequenceDiagram
   participant DeployA
   participant Policy1
+  participant Policy2
   participant Karmada
 
   Policy1 ->> Karmada: create (placement=member1)
   activate Karmada
   DeployA ->> Karmada: create (replicas=2)
-  Karmada -->> DeployA: propagate it by Policy1 (member1)
+  Karmada -->> DeployA: propagate it to member1 by Policy1
   deactivate Karmada
   
   Policy1 ->> Karmada: delete
@@ -357,10 +359,15 @@ sequenceDiagram
   end
   deactivate Karmada
 
-  DeployA ->> Karmada: update (change replicas from 2 to 5)
+  DeployA ->> Karmada: update (replicas 2 -> 5)
   activate Karmada
   Karmada -->> DeployA: add to waiting list for no matchable policy
   Note over DeployA, Karmada: the existing 2 replicas unchanged, the additional 3 replicas pending
+  deactivate Karmada
+
+  Policy2 ->> Karmada: create (placement=member2)
+  activate Karmada
+  Karmada -->> DeployA: all 5 replicas propagated to member2 by Policy2
   deactivate Karmada
 ```
 
