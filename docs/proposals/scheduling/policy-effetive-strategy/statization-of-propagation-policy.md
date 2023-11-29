@@ -57,15 +57,32 @@ At this point, the cluster administrator has the following two types of requirem
   the administrator would like to have a way to individually configure a customized distribution policy for the individual user.
 
 
+```mermaid
+graph LR
+A(fa:fa-user-cog Cluster Administrator) --> B[Create Global Default \n ClusterPropagationPolicy]
+B --> C{Change\nRequirements}
+C --> D[Update Default \n ClusterPropagationPolicy]
+C --> E[Customize Another \n ClusterPropagationPolicy]
+D --> F{{Demand: don't affect resource immediately}}
+E --> G{{Demand: take over batch of resources from Default CPP}}
+```
+
 ## Proposal
 
 The current Policy mechanism has some limitations, we need to optimize the behavior of Policy.
 
+### Guideline
+
+Any workload is running fine, don't roughly change them!
+
 ### Base Principle
 
-* PropagationPolicy / ClusterPropagationPolicy should not have any API fields that can actively cause system changes.
-* PropagationPolicy / ClusterPropagationPolicy are just a bunch of API-enabled system functions, changes should be triggered from the Resource Template.
-* If workloads are running fine, don't roughly change them!
+* PropagationPolicy / ClusterPropagationPolicy are just a bunch of API-enabled system functions, shouldn't actively cause any existing workload distribution changes in the system.
+* Any destructive changes should be triggered from the ResourceTemplate.
+* After ResourceTemplate changed, there must be a matching Policy for subsequent propagation. If there is no matching policy, it should be pending.
+
+> When ambiguity is encountered, clarification should be based on the perspective of what kind of system behavior is easier for users to understand
+> and what kind of operational results are more acceptable to users.
 
 ### Detail Proposal
 
@@ -332,7 +349,9 @@ sequenceDiagram
   deactivate Karmada
 ```
 
-#### Case 6
+### Corner Case
+
+#### Case 1
 
 1. create PropagationPolicy Policy1 (placement=member1, match to DeployA)
 2. create ResourceTemplate DeployA (replicas=2)
@@ -372,6 +391,24 @@ sequenceDiagram
   deactivate Karmada
 ```
 
+In-Depth Interpretation:
+
+* When no matching Policy, ResourceTemplate should be pending for propagation and remain unchanged until a new Policy occurred.
+  Besides, deletion should happen when the ResourceTemplate is deleted, any policy changes should not cause deletion.
+* Refer to the K8s mechanism, each pod is scheduled individually, so after there is a satisfying scheduling condition, it is directly scheduled.
+  But our ResourceBinding is the overall scheduling, if you enter the scheduler processing, the existing 2 instances will also be calculated together.
+  We can only follow the inertia rule as much as possible, and try not to move the 3 instances that are already running.
+* Instances in the pending state don't count towards the overall state of the system already running. So when the new Policy occurred, 
+  scheduling the pending 3 instances down is beneficial to the overall system.
+
+##  Design Details
+
+
+## 
+
+### Test Plan
+
+
 ## Risks and Mitigations
 
 ### Compatibility risk
@@ -382,8 +419,8 @@ and supporting preemption by default, which is a big change in behavior and has 
 
 Mitigations：
 
-* **v1.8：control this feature by a feature-gate, turn off by default, advising users to turn on.**
-* **v1.9：control this feature by a feature-gate, turn on by default, allowing users to turn off in special cases.**
+* **Karmada v1.9 version：control this feature by a feature-gate, turn off by default, advising users to turn on.**
+* **Karmada v1.10 version：control this feature by a feature-gate, turn on by default, allowing users to turn off in special cases.**
 
 > The previous design was not good enough, this proposal makes more sense. Even if it destroys compatibility,
 it has to be changed to benefit more users in the future
@@ -421,7 +458,7 @@ and that the distribution of user's ResourceTemplates is inert.
 
 Answers:
 
-A new `karmadactl` command could be added to support proactively triggering the reconciliation of all ResourceTemplates managed by a given policy.
+A new `karmadactl` command will be added to support proactively triggering the reconciliation of all ResourceTemplates managed by a given policy.
 
 Just like:
 ```shell
