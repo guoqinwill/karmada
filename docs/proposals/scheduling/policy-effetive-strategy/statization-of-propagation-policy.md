@@ -409,37 +409,37 @@ In-Depth Interpretation:
 
 ### Test Plan
 
-* Test Case 1
+**Test Case 1**
 1. create deployment nginx
 2. create propogationpolicy pp1 (match to nginx, propagate to member1), expect seeing nginx follow pp1 propagated to member1
 
-* Test Case 2
+**Test Case 2**
 1. create propogationpolicy pp1 (match to nginx, propagate to member1)
 2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
 3. modify pp1 (still match to nginx, change to propagate to member2), expect seeing nginx keep unchanged
 4. modify nginx, expect seeing nginx follow pp1 propagated to member2
 
-* Test Case 3
+**Test Case 3**
 1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
 2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
 3. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2), expect seeing nginx keep unchanged
 4. modify nginx, expect seeing nginx follow pp2 propagated to member2
 
-* Test Case 4
+**Test Case 4**
 1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
 2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
 3. modify pp1 (still match to nginx, change to propagate to member3), expect seeing nginx keep unchanged
 4. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2), expect seeing nginx keep unchanged
 5. modify nginx, expect seeing nginx follow pp2 propagated to member2
 
-* Test Case 5
+**Test Case 5**
 1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
 2. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2)
 3. create deployment nginx, expect seeing nginx follow pp2 propagated to member2
 4. modify pp2 (no longer match to nginx), expect seeing nginx keep unchanged (but the policy label of nginx and related binding should be deleted)
 5. modify nginx, expect seeing nginx follow pp1 propagated to member1
 
-* Test Case 6
+**Test Case 6**
 1. create propogationpolicy pp1 (match to nginx, propagate to member1)
 2. create deployment nginx (replicas is 2), expect seeing nginx follow pp1 propagated to member1
 3. delete pp1, expect seeing nginx keep unchanged (but the policy label of nginx and related binding should be deleted)
