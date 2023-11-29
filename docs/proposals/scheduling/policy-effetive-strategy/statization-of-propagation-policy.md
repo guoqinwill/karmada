@@ -63,7 +63,7 @@ A(fa:fa-user-cog Cluster Administrator) --> B[Create Global Default \n ClusterPr
 B --> C{Change\nRequirements}
 C --> D[Update Default \n ClusterPropagationPolicy]
 C --> E[Customize Another \n ClusterPropagationPolicy]
-D --> F{{Demand: don't affect resource immediately}}
+D --> F{{Demand: don't affect existing resource immediately}}
 E --> G{{Demand: take over batch of resources from Default CPP}}
 ```
 
@@ -404,10 +404,49 @@ In-Depth Interpretation:
 ##  Design Details
 
 
-## 
+### Work Disassembly
+
 
 ### Test Plan
 
+* Test Case 1
+1. create deployment nginx
+2. create propogationpolicy pp1 (match to nginx, propagate to member1), expect seeing nginx follow pp1 propagated to member1
+
+* Test Case 2
+1. create propogationpolicy pp1 (match to nginx, propagate to member1)
+2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
+3. modify pp1 (still match to nginx, change to propagate to member2), expect seeing nginx keep unchanged
+4. modify nginx, expect seeing nginx follow pp1 propagated to member2
+
+* Test Case 3
+1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
+2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
+3. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2), expect seeing nginx keep unchanged
+4. modify nginx, expect seeing nginx follow pp2 propagated to member2
+
+* Test Case 4
+1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
+2. create deployment nginx, expect seeing nginx follow pp1 propagated to member1
+3. modify pp1 (still match to nginx, change to propagate to member3), expect seeing nginx keep unchanged
+4. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2), expect seeing nginx keep unchanged
+5. modify nginx, expect seeing nginx follow pp2 propagated to member2
+
+* Test Case 5
+1. create propogationpolicy pp1 (match to nginx, propagate to member1, priority=1)
+2. create propogationpolicy pp2 with higher priority (match to nginx, propagate to member2, priority=2)
+3. create deployment nginx, expect seeing nginx follow pp2 propagated to member2
+4. modify pp2 (no longer match to nginx), expect seeing nginx keep unchanged (but the policy label of nginx and related binding should be deleted)
+5. modify nginx, expect seeing nginx follow pp1 propagated to member1
+
+* Test Case 6
+1. create propogationpolicy pp1 (match to nginx, propagate to member1)
+2. create deployment nginx (replicas is 2), expect seeing nginx follow pp1 propagated to member1
+3. delete pp1, expect seeing nginx keep unchanged (but the policy label of nginx and related binding should be deleted)
+4. modify nginx (replicas change to 5), expect seeing nginx existing 2 replicas keep unchanged, while additional 3 replicas is in pending status
+5. create propogationpolicy pp2 (match to nginx, propagate to member2), expect seeing nginx all 5 replicas follow pp2 propagated to member2
+
+> Note: ClusterPropagationPolicy has 6 similar test case as above.
 
 ## Risks and Mitigations
 
