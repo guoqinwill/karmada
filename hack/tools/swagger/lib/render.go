@@ -27,9 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgorest "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
@@ -80,6 +83,8 @@ func RenderOpenAPISpec(cfg Config) (string, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(cfg.Codecs)
+	serverConfig.ClientConfig = &clientgorest.Config{}
+	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", features.APIPriorityAndFairness, false))
 	if err := options.ApplyTo(serverConfig); err != nil {
 		klog.Fatal(err)
 		return "", err
