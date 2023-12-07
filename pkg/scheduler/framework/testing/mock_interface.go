@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+
 	v1alpha1 "github.com/karmada-io/karmada/pkg/apis/cluster/v1alpha1"
 	v1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
 	framework "github.com/karmada-io/karmada/pkg/scheduler/framework"
