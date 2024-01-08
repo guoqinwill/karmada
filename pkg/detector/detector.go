@@ -258,6 +258,10 @@ func (d *ResourceDetector) Reconcile(key util.QueueKey) error {
 	return d.propagateResource(object, clusterWideKey)
 }
 
+var ignoredGVK = map[string]struct{}{
+	"extensions/v1beta1": {},
+}
+
 // EventFilter tells if an object should be taken care of.
 //
 // All objects under Karmada reserved namespace should be ignored:
@@ -308,6 +312,17 @@ func (d *ResourceDetector) EventFilter(obj interface{}) bool {
 	// Refer to https://github.com/karmada-io/karmada/issues/4228 for more details.
 	if clusterWideKey.Namespace == "kube-system" && clusterWideKey.Kind == "ConfigMap" &&
 		clusterWideKey.Name == "extension-apiserver-authentication" {
+		return false
+	}
+
+	// Some resources are available in more than one group in the same kubernetes version.
+	// Therefore, the following scenarios occurs:
+	// In v1.21 kubernetes cluster, Ingress are available in both networking.k8s.io and extensions groups.
+	// When user creates an Ingress(networking.k8s.io/v1) and specifies a PropagationPolicy to propagate it
+	// to the member clusters, the detector will listen two resource creation events:
+	// Ingress(networking.k8s.io/v1) and Ingress(extensions/v1beta1). In order to prevent
+	// Ingress(extensions/v1beta1) from being propagated, we need to ignore it.
+	if _, ok := ignoredGVK[clusterWideKey.GroupVersionKind().String()]; ok {
 		return false
 	}
 
