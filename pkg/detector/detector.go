@@ -259,7 +259,7 @@ func (d *ResourceDetector) Reconcile(key util.QueueKey) error {
 }
 
 var ignoredGVK = map[string]struct{}{
-	"extensions/v1beta1": {},
+	schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}.String(): {},
 }
 
 // EventFilter tells if an object should be taken care of.
@@ -321,7 +321,7 @@ func (d *ResourceDetector) EventFilter(obj interface{}) bool {
 	// When user creates an Ingress(networking.k8s.io/v1) and specifies a PropagationPolicy to propagate it
 	// to the member clusters, the detector will listen two resource creation events:
 	// Ingress(networking.k8s.io/v1) and Ingress(extensions/v1beta1). In order to prevent
-	// Ingress(extensions/v1beta1) from being propagated, we need to ignore it.
+	//   from being propagated, we need to ignore it.
 	if _, ok := ignoredGVK[clusterWideKey.GroupVersionKind().String()]; ok {
 		return false
 	}
