@@ -158,3 +158,100 @@ func MetaNamespaceKeyFunc(obj interface{}) (QueueKey, error) {
 	}
 	return key, nil
 }
+
+// AsyncResourceWorker maintains a rate limiting queue and the items in the queue will be reconciled by a "ReconcileFunc".
+// The item will be re-queued if "ReconcileFunc" returns an error, maximum re-queue times defined by "maxRetries" above,
+// after that the item will be discarded from the queue.
+type AsyncResourceWorker interface {
+	// Add adds the 'item' to queue immediately(without any delay).
+	Add(item interface{})
+
+	// AddAfter adds an item to the workqueue after the indicated duration has passed
+	AddAfter(item interface{}, duration time.Duration)
+
+	// Enqueue generates the key of 'obj' according to a 'KeyFunc' then adds the key as an item to queue by 'Add'.
+	Enqueue(obj interface{})
+
+	// Run starts a certain number of concurrent workers to reconcile the items and will never stop until 'stopChan'
+	// is closed.
+	Run(workerNumber int, stopChan <-chan struct{})
+}
+
+type asyncResourceWorker struct {
+	// keyFunc is the function that make keys for API objects.
+	keyFunc KeyFunc
+	// reconcileFunc is the function that process keys from the queue.
+	reconcileFunc ReconcileFunc
+	// queue allowing parallel processing of resources.
+	queue workqueue.RateLimitingInterface
+}
+
+// NewAsyncResourceWorker returns a asyncWorker which can process resource periodic.
+func NewAsyncResourceWorker(opt Options) AsyncResourceWorker {
+	return &asyncResourceWorker{
+		keyFunc:       opt.KeyFunc,
+		reconcileFunc: opt.ReconcileFunc,
+		queue: workqueue.NewRateLimitingQueueWithConfig(ratelimiterflag.DefaultControllerRateLimiter(opt.RateLimiterOptions), workqueue.RateLimitingQueueConfig{
+			Name: opt.Name,
+		}),
+	}
+}
+
+func (w *asyncResourceWorker) Enqueue(obj interface{}) {
+	key, err := w.keyFunc(obj)
+	if err != nil {
+		klog.Warningf("Failed to generate key for obj: %+v", obj)
+		return
+	}
+
+	if key == nil {
+		return
+	}
+
+	w.Add(key)
+}
+
+func (w *asyncResourceWorker) Add(item interface{}) {
+	if item == nil {
+		klog.Warningf("Ignore nil item from queue")
+		return
+	}
+
+	w.queue.Add(item)
+}
+
+func (w *asyncResourceWorker) AddAfter(item interface{}, duration time.Duration) {
+	if item == nil {
+		klog.Warningf("Ignore nil item from queue")
+		return
+	}
+
+	w.queue.AddAfter(item, duration)
+}
+
+func (w *asyncResourceWorker) worker() {
+	key, quit := w.queue.Get()
+	if quit {
+		return
+	}
+	defer w.queue.Done(key)
+
+	err := w.reconcileFunc(key)
+	if err != nil {
+		w.queue.AddRateLimited(key)
+		return
+	}
+
+	w.queue.Forget(key)
+}
+
+func (w *asyncResourceWorker) Run(workerNumber int, stopChan <-chan struct{}) {
+	for i := 0; i < workerNumber; i++ {
+		go wait.Until(w.worker, 0, stopChan)
+	}
+	// Ensure all goroutines are cleaned up when the stop channel closes
+	go func() {
+		<-stopChan
+		w.queue.ShutDown()
+	}()
+}

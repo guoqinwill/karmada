@@ -73,7 +73,7 @@ type ResourceDetector struct {
 	DynamicClient                dynamic.Interface
 	InformerManager              genericmanager.SingleClusterInformerManager
 	EventHandler                 cache.ResourceEventHandler
-	Processor                    util.AsyncWorker
+	Processor                    util.AsyncResourceWorker
 	SkippedResourceConfig        *util.SkippedResourceConfig
 	SkippedPropagatingNamespaces []*regexp.Regexp
 	// ResourceInterpreter knows the details of resource structure.
@@ -154,13 +154,13 @@ func (d *ResourceDetector) Start(ctx context.Context) error {
 
 	detectorWorkerOptions := util.Options{
 		Name:               "resource detector",
-		KeyFunc:            ClusterWideKeyFunc,
+		KeyFunc:            ResourceItemKeyFunc,
 		ReconcileFunc:      d.Reconcile,
 		RateLimiterOptions: d.RateLimiterOptions,
 	}
 
 	d.EventHandler = fedinformer.NewFilteringHandlerOnAllEvents(d.EventFilter, d.OnAdd, d.OnUpdate, d.OnDelete)
-	d.Processor = util.NewAsyncWorker(detectorWorkerOptions)
+	d.Processor = util.NewAsyncResourceWorker(detectorWorkerOptions)
 	d.Processor.Run(d.ConcurrentResourceTemplateSyncs, d.stopCh)
 	go d.discoverResources(30 * time.Second)
 
@@ -226,11 +226,14 @@ func (d *ResourceDetector) NeedLeaderElection() bool {
 // Reconcile performs a full reconciliation for the object referred to by the key.
 // The key will be re-queued if an error is non-nil.
 func (d *ResourceDetector) Reconcile(key util.QueueKey) error {
-	clusterWideKey, ok := key.(keys.ClusterWideKey)
+	clusterWideKeyWithConfig, ok := key.(keys.ClusterWideKeyWithConfig)
 	if !ok {
 		klog.Error("Invalid key")
 		return fmt.Errorf("invalid key")
 	}
+
+	clusterWideKey := clusterWideKeyWithConfig.ClusterWideKey
+	config := clusterWideKeyWithConfig.ExtendConfig
 	klog.Infof("Reconciling object: %s", clusterWideKey)
 
 	object, err := d.GetUnstructuredObject(clusterWideKey)
@@ -243,7 +246,7 @@ func (d *ResourceDetector) Reconcile(key util.QueueKey) error {
 			// currently we do that by setting owner reference to derived objects.
 			return nil
 		}
-		klog.Errorf("Failed to get unstructured object(%s), error: %v", clusterWideKey, err)
+		klog.Errorf("Failed to get unstructured object(%s), error: %v", clusterWideKeyWithConfig, err)
 		return err
 	}
 
@@ -255,7 +258,7 @@ func (d *ResourceDetector) Reconcile(key util.QueueKey) error {
 		return nil
 	}
 
-	return d.propagateResource(object, clusterWideKey)
+	return d.propagateResource(object, clusterWideKey, config)
 }
 
 // EventFilter tells if an object should be taken care of.
@@ -320,7 +323,13 @@ func (d *ResourceDetector) OnAdd(obj interface{}) {
 	if !ok {
 		return
 	}
-	d.Processor.Enqueue(runtimeObj)
+
+	resourceItem := ResourceItem{
+		Obj:          runtimeObj,
+		ExtendConfig: map[string]interface{}{},
+	}
+
+	d.Processor.Enqueue(resourceItem)
 }
 
 // OnUpdate handles object update event and push the object to queue.
@@ -337,12 +346,26 @@ func (d *ResourceDetector) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
+	newRuntimeObj, ok := newObj.(runtime.Object)
+	if !ok {
+		return
+	}
+
 	if !eventfilter.SpecificationChanged(unstructuredOldObj, unstructuredNewObj) {
 		klog.V(4).Infof("Ignore update event of object (kind=%s, %s/%s) as specification no change", unstructuredOldObj.GetKind(), unstructuredOldObj.GetNamespace(), unstructuredOldObj.GetName())
 		return
 	}
 
-	d.OnAdd(newObj)
+	objectChangedFromKarmada := eventfilter.ObjectChangedFromKarmada(unstructuredOldObj, unstructuredNewObj)
+
+	resourceItem := ResourceItem{
+		Obj: newRuntimeObj,
+		ExtendConfig: map[string]interface{}{
+			ObjectChangedFromKarmada: objectChangedFromKarmada,
+		},
+	}
+
+	d.Processor.Enqueue(resourceItem)
 }
 
 // OnDelete handles object delete event and push the object to queue.
@@ -407,7 +430,8 @@ func (d *ResourceDetector) LookForMatchedClusterPolicy(object *unstructured.Unst
 }
 
 // ApplyPolicy starts propagate the object referenced by object key according to PropagationPolicy.
-func (d *ResourceDetector) ApplyPolicy(object *unstructured.Unstructured, objectKey keys.ClusterWideKey, policy *policyv1alpha1.PropagationPolicy) (err error) {
+func (d *ResourceDetector) ApplyPolicy(object *unstructured.Unstructured, objectKey keys.ClusterWideKey,
+	config map[string]interface{}, policy *policyv1alpha1.PropagationPolicy) (err error) {
 	start := time.Now()
 	klog.Infof("Applying policy(%s/%s) for object: %s", policy.Namespace, policy.Name, objectKey)
 	var operationResult controllerutil.OperationResult
@@ -424,6 +448,17 @@ func (d *ResourceDetector) ApplyPolicy(object *unstructured.Unstructured, object
 	if err != nil {
 		klog.Errorf("Failed to claim policy(%s) for object: %s", policy.Name, object)
 		return err
+	}
+
+	objectChangedFromKarmada, ok := config[ObjectChangedFromKarmada].(bool)
+	if !ok {
+		klog.Errorf("")
+		return fmt.Errorf("")
+	}
+
+	if objectChangedFromKarmada && util.IsDelayActivationEnabled(policy.Spec.ActivationStrategy) {
+		klog.Infof("update from karmada and delay activation enabled, skip refresh binding.")
+		return
 	}
 
 	policyLabels := map[string]string{
@@ -497,7 +532,8 @@ func (d *ResourceDetector) ApplyPolicy(object *unstructured.Unstructured, object
 
 // ApplyClusterPolicy starts propagate the object referenced by object key according to ClusterPropagationPolicy.
 // nolint:gocyclo
-func (d *ResourceDetector) ApplyClusterPolicy(object *unstructured.Unstructured, objectKey keys.ClusterWideKey, policy *policyv1alpha1.ClusterPropagationPolicy) (err error) {
+func (d *ResourceDetector) ApplyClusterPolicy(object *unstructured.Unstructured, objectKey keys.ClusterWideKey,
+	config map[string]interface{}, policy *policyv1alpha1.ClusterPropagationPolicy) (err error) {
 	start := time.Now()
 	klog.Infof("Applying cluster policy(%s) for object: %s", policy.Name, objectKey)
 	var operationResult controllerutil.OperationResult
@@ -514,6 +550,17 @@ func (d *ResourceDetector) ApplyClusterPolicy(object *unstructured.Unstructured,
 	if err != nil {
 		klog.Errorf("Failed to claim cluster policy(%s) for object: %s", policy.Name, object)
 		return err
+	}
+
+	objectChangedFromKarmada, ok := config[ObjectChangedFromKarmada].(bool)
+	if !ok {
+		klog.Errorf("")
+		return fmt.Errorf("")
+	}
+
+	if objectChangedFromKarmada && util.IsDelayActivationEnabled(policy.Spec.ActivationStrategy) {
+		klog.Infof("update from karmada and delay activation enabled, skip refresh binding.")
+		return
 	}
 
 	policyLabels := map[string]string{
@@ -1124,10 +1171,14 @@ func (d *ResourceDetector) ReconcileClusterPropagationPolicy(key util.QueueKey) 
 }
 
 // HandlePropagationPolicyDeletion handles PropagationPolicy delete event.
-// After a policy is removed, the label marked on relevant resource template will be removed(which gives
+// After a policy is removed, the label marked on relevant resource template will be removed (which gives
 // the resource template a change to match another policy).
 //
 // Note: The relevant ResourceBinding will continue to exist until the resource template is gone.
+//
+// Corner Case: If DelayActivation is enabled, the specified label will also be removed.
+// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+// Consequently, the resource will not perform a reconcile and will not match to other policies immediately until itself is updated.
 func (d *ResourceDetector) HandlePropagationPolicyDeletion(policyNS string, policyName string) error {
 	labelSet := labels.Set{
 		policyv1alpha1.PropagationPolicyNamespaceLabel: policyNS,
@@ -1161,10 +1212,14 @@ func (d *ResourceDetector) HandlePropagationPolicyDeletion(policyNS string, poli
 }
 
 // HandleClusterPropagationPolicyDeletion handles ClusterPropagationPolicy delete event.
-// After a policy is removed, the label marked on relevant resource template will be removed(which gives
+// After a policy is removed, the label marked on relevant resource template will be removed (which gives
 // the resource template a change to match another policy).
 //
 // Note: The relevant ClusterResourceBinding or ResourceBinding will continue to exist until the resource template is gone.
+//
+// Corner Case: If DelayActivation is enabled, the specified label will also be removed.
+// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+// Consequently, the resource will not perform a reconcile and not match to other policies immediately until itself is updated.
 func (d *ResourceDetector) HandleClusterPropagationPolicyDeletion(policyName string) error {
 	var errs []error
 	labelSet := labels.Set{
@@ -1234,44 +1289,60 @@ func (d *ResourceDetector) HandleClusterPropagationPolicyDeletion(policyName str
 // from waiting list and throw the object to it's reconcile queue. If not, do nothing.
 // Finally, handle the propagation policy preemption process if preemption is enabled.
 func (d *ResourceDetector) HandlePropagationPolicyCreationOrUpdate(policy *policyv1alpha1.PropagationPolicy) error {
+	// If the Policy's ResourceSelectors change, causing certain resources to no longer match the Policy, the label marked
+	// on relevant resource template will be removed (which gives the resource template a change to match another policy).
+	//
+	// There exist a corner case that if DelayActivation is enabled, the specified label will also be removed.
+	// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+	// Consequently, the resource will not perform a reconcile and not match to other policies immediately until itself is updated.
 	err := d.cleanPPUnmatchedResourceBindings(policy.Namespace, policy.Name, policy.Spec.ResourceSelectors)
 	if err != nil {
 		return err
 	}
 
-	// When updating fields other than ResourceSelector, should first find the corresponding ResourceBinding
-	// and add the bound object to the processor's queue for reconciliation to make sure that
-	// PropagationPolicy's updates can be synchronized to ResourceBinding.
-	resourceBindings, err := d.listPPDerivedRB(policy.Namespace, policy.Name)
-	if err != nil {
-		return err
-	}
-	for _, rb := range resourceBindings.Items {
-		resourceKey, err := helper.ConstructClusterWideKey(rb.Spec.Resource)
+	// if DelayActivation is disabled, add the PP related RT to processor, otherwise just skip this step
+	if util.IsDelayActivationEnabled(policy.Spec.ActivationStrategy) {
+		// When updating fields other than ResourceSelector, should first find the corresponding ResourceBinding
+		// and add the bound object to the processor's queue for reconciliation to make sure that
+		// PropagationPolicy's updates can be synchronized to ResourceBinding.
+		resourceBindings, err := d.listPPDerivedRB(policy.Namespace, policy.Name)
 		if err != nil {
 			return err
 		}
-		d.Processor.Add(resourceKey)
-	}
+		for _, rb := range resourceBindings.Items {
+			resourceKey, err := helper.ConstructClusterWideKey(rb.Spec.Resource)
+			if err != nil {
+				return err
+			}
+			d.Processor.Add(resourceKey)
+		}
 
-	matchedKeys := d.GetMatching(policy.Spec.ResourceSelectors)
-	klog.Infof("Matched %d resources by policy(%s/%s)", len(matchedKeys), policy.Namespace, policy.Name)
+		// check whether there are matched RT in waiting list, is so, add it to processor
+		matchedKeys := d.GetMatching(policy.Spec.ResourceSelectors)
+		klog.Infof("Matched %d resources by policy(%s/%s)", len(matchedKeys), policy.Namespace, policy.Name)
 
-	// check dependents only when there at least a real match.
-	if len(matchedKeys) > 0 {
-		// return err when dependents not present, that we can retry at next reconcile.
-		if present, err := helper.IsDependentOverridesPresent(d.Client, policy); err != nil || !present {
-			klog.Infof("Waiting for dependent overrides present for policy(%s/%s)", policy.Namespace, policy.Name)
-			return fmt.Errorf("waiting for dependent overrides")
+		// check dependents only when there at least a real match.
+		if len(matchedKeys) > 0 {
+			// return err when dependents not present, that we can retry at next reconcile.
+			if present, err := helper.IsDependentOverridesPresent(d.Client, policy); err != nil || !present {
+				klog.Infof("Waiting for dependent overrides present for policy(%s/%s)", policy.Namespace, policy.Name)
+				return fmt.Errorf("waiting for dependent overrides")
+			}
+		}
+
+		for _, key := range matchedKeys {
+			d.RemoveWaiting(key)
+			d.Processor.Add(key)
 		}
 	}
 
-	for _, key := range matchedKeys {
-		d.RemoveWaiting(key)
-		d.Processor.Add(key)
-	}
-
-	// if preemption is enabled, handle the preemption process.
+	// If preemption is enabled, handle the preemption process.
+	// If this policy succeeds in preempting resource managed by other policy, the label marked on relevant resource will be replaced,
+	// which gives the resource template a change to match to this policy.
+	//
+	// There exist a corner case that if DelayActivation is enabled, the specified label will also be replaced.
+	// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+	// Consequently, the resource will not perform a reconcile and not match to this policy immediately until itself is updated.
 	if preemptionEnabled(policy.Spec.Preemption) {
 		return d.handlePropagationPolicyPreemption(policy)
 	}
@@ -1286,6 +1357,12 @@ func (d *ResourceDetector) HandlePropagationPolicyCreationOrUpdate(policy *polic
 // from waiting list and throw the object to it's reconcile queue. If not, do nothing.
 // Finally, handle the cluster propagation policy preemption process if preemption is enabled.
 func (d *ResourceDetector) HandleClusterPropagationPolicyCreationOrUpdate(policy *policyv1alpha1.ClusterPropagationPolicy) error {
+	// If the Policy's ResourceSelectors change, causing certain resources to no longer match the Policy, the label marked
+	// on relevant resource template will be removed (which gives the resource template a change to match another policy).
+	//
+	// There exist a corner case that if DelayActivation is enabled, the specified label will also be removed.
+	// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+	// Consequently, the resource will not perform a reconcile and not match to other policies immediately until itself is updated.
 	err := d.cleanCPPUnmatchedResourceBindings(policy.Name, policy.Spec.ResourceSelectors)
 	if err != nil {
 		return err
@@ -1296,54 +1373,71 @@ func (d *ResourceDetector) HandleClusterPropagationPolicyCreationOrUpdate(policy
 		return err
 	}
 
-	// When updating fields other than ResourceSelector, should first find the corresponding ResourceBinding/ClusterResourceBinding
-	// and add the bound object to the processor's queue for reconciliation to make sure that
-	// ClusterPropagationPolicy's updates can be synchronized to ResourceBinding/ClusterResourceBinding.
+	// if DelayActivation is disabled, add the PP related RT to processor, otherwise just skip this step
+	if !util.IsDelayActivationEnabled(policy.Spec.ActivationStrategy) {
+		if err = d.addRelatedTemplateToProcessorQueue(policy); err != nil {
+			return err
+		}
+
+		// check whether there are matched RT in waiting list, is so, add it to processor
+		matchedKeys := d.GetMatching(policy.Spec.ResourceSelectors)
+		klog.Infof("Matched %d resources by policy(%s)", len(matchedKeys), policy.Name)
+
+		// check dependents only when there at least a real match.
+		if len(matchedKeys) > 0 {
+			// return err when dependents not present, that we can retry at next reconcile.
+			if present, err := helper.IsDependentClusterOverridesPresent(d.Client, policy); err != nil || !present {
+				klog.Infof("Waiting for dependent overrides present for policy(%s)", policy.Name)
+				return fmt.Errorf("waiting for dependent overrides")
+			}
+		}
+
+		for _, key := range matchedKeys {
+			d.RemoveWaiting(key)
+			d.Processor.Add(key)
+		}
+	}
+
+	// If preemption is enabled, handle the preemption process.
+	// If this policy succeeds in preempting resource managed by other policy, the label marked on relevant resource
+	// will be replaced, which gives the resource template a change to match to this policy.
+	//
+	// There exist a corner case that if DelayActivation is enabled, the specified label will also be replaced.
+	// However, since Karmada itself initiates this label change, the detector will ignore the update event.
+	// Consequently, the resource will not perform a reconcile and not match to this policy immediately until itself is updated.
+	if preemptionEnabled(policy.Spec.Preemption) {
+		return d.handleClusterPropagationPolicyPreemption(policy)
+	}
+
+	return nil
+}
+
+// addRelatedTemplateToProcessorQueue When updating fields other than ResourceSelector, should first find the corresponding
+// ResourceBinding/ClusterResourceBinding and add the bound object to the processor's queue for reconciliation to make sure that
+// ClusterPropagationPolicy's updates can be synchronized to ResourceBinding/ClusterResourceBinding.
+func (d *ResourceDetector) addRelatedTemplateToProcessorQueue(policy *policyv1alpha1.ClusterPropagationPolicy) error {
 	resourceBindings, err := d.listCPPDerivedRB(policy.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list CPP(%s) derived RB: %+v", policy.Name, err)
 	}
 	clusterResourceBindings, err := d.listCPPDerivedCRB(policy.Name)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list CPP(%s) derived CRB: %+v", policy.Name, err)
 	}
 	for _, rb := range resourceBindings.Items {
 		resourceKey, err := helper.ConstructClusterWideKey(rb.Spec.Resource)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get resource ClusterWideKey from RB(%s): %+v", rb.Name, err)
 		}
 		d.Processor.Add(resourceKey)
 	}
 	for _, crb := range clusterResourceBindings.Items {
 		resourceKey, err := helper.ConstructClusterWideKey(crb.Spec.Resource)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get resource ClusterWideKey from CRB(%s): %+v", crb.Name, err)
 		}
 		d.Processor.Add(resourceKey)
 	}
-
-	matchedKeys := d.GetMatching(policy.Spec.ResourceSelectors)
-	klog.Infof("Matched %d resources by policy(%s)", len(matchedKeys), policy.Name)
-
-	// check dependents only when there at least a real match.
-	if len(matchedKeys) > 0 {
-		// return err when dependents not present, that we can retry at next reconcile.
-		if present, err := helper.IsDependentClusterOverridesPresent(d.Client, policy); err != nil || !present {
-			klog.Infof("Waiting for dependent overrides present for policy(%s)", policy.Name)
-			return fmt.Errorf("waiting for dependent overrides")
-		}
-	}
-
-	for _, key := range matchedKeys {
-		d.RemoveWaiting(key)
-		d.Processor.Add(key)
-	}
-
-	// if preemption is enabled, handle the preemption process.
-	if preemptionEnabled(policy.Spec.Preemption) {
-		return d.handleClusterPropagationPolicyPreemption(policy)
-	}
-
 	return nil
 }
 

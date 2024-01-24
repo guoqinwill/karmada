@@ -43,6 +43,11 @@ type ClusterWideKey struct {
 	Name string
 }
 
+type ClusterWideKeyWithConfig struct {
+	ClusterWideKey ClusterWideKey
+	ExtendConfig   map[string]interface{}
+}
+
 // String returns the key's printable info with format:
 // "<GroupVersion>, kind=<Kind>, <NamespaceKey>"
 func (k ClusterWideKey) String() string {

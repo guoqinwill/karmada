@@ -152,6 +152,10 @@ type PropagationSpec struct {
 	// +kubebuilder:validation:Enum=Abort;Overwrite
 	// +optional
 	ConflictResolution ConflictResolution `json:"conflictResolution,omitempty"`
+
+	// ActivationStrategy
+	// +optional
+	ActivationStrategy ActivationStrategy `json:"activationStrategy,omitempty"`
 }
 
 // ResourceSelector the resources will be selected.
@@ -516,6 +520,14 @@ const (
 
 	// ConflictAbort means that do not resolve the conflict and stop propagating.
 	ConflictAbort ConflictResolution = "Abort"
+)
+
+type ActivationStrategy string
+
+const (
+	DelayActivation ActivationStrategy = "DelayActivation"
+
+	ImmediateActivation ActivationStrategy = "ImmediateActivation"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
