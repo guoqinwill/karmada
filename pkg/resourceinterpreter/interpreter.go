@@ -186,6 +186,7 @@ func (i *customResourceInterpreterImpl) Retain(desired *unstructured.Unstructure
 		return nil, err
 	}
 	if hookEnabled {
+		klog.Infof("[DEBUG] desired after configurableInterpreter: %+v", obj)
 		return obj, nil
 	}
 
@@ -199,6 +200,7 @@ func (i *customResourceInterpreterImpl) Retain(desired *unstructured.Unstructure
 		return nil, err
 	}
 	if hookEnabled {
+		klog.Infof("[DEBUG] desired after customizedInterpreter: %+v", obj)
 		return obj, nil
 	}
 	obj, hookEnabled, err = i.thirdpartyInterpreter.Retain(desired, observed)
@@ -208,6 +210,8 @@ func (i *customResourceInterpreterImpl) Retain(desired *unstructured.Unstructure
 	if hookEnabled {
 		return obj, nil
 	}
+
+	klog.Infof("[DEBUG] desired after: %+v", desired)
 
 	return i.defaultInterpreter.Retain(desired, observed)
 }

@@ -84,7 +84,7 @@ type PropagationSpec struct {
 
 	// Placement represents the rule for select clusters to propagate resources.
 	// +optional
-	Placement Placement `json:"placement,omitempty"`
+	Placement Placement `json:"placement"`
 
 	// Priority indicates the importance of a policy(PropagationPolicy or ClusterPropagationPolicy).
 	// A policy will be applied for the matched resource templates if there is
@@ -286,7 +286,7 @@ type Placement struct {
 	//   2. If both ClusterAffinity and ClusterAffinities are not set, any cluster
 	//      can be scheduling candidates.
 	// +optional
-	ClusterAffinity *ClusterAffinity `json:"clusterAffinity,omitempty"`
+	ClusterAffinity *ClusterAffinity `json:"clusterAffinity"`
 
 	// ClusterAffinities represents scheduling restrictions to multiple cluster
 	// groups that indicated by ClusterAffinityTerm.
@@ -396,6 +396,11 @@ type ClusterAffinity struct {
 	// ExcludedClusters is the list of clusters to be ignored.
 	// +optional
 	ExcludeClusters []string `json:"exclude,omitempty"`
+
+	AA []string  `json:"AA"`
+	BB []string  `json:"BB,omitempty"`
+	CC *[]string `json:"CC"`
+	DD *[]string `json:"DD,omitempty"`
 }
 
 // ClusterAffinityTerm selects a set of cluster.

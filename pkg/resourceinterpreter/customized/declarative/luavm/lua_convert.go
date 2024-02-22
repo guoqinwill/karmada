@@ -17,10 +17,9 @@ limitations under the License.
 package luavm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"reflect"
-
 	lua "github.com/yuin/gopher-lua"
 	"k8s.io/apimachinery/pkg/conversion"
 	luajson "layeh.com/gopher-json"
@@ -28,7 +27,7 @@ import (
 
 // ConvertLuaResultInto convert lua result to obj
 func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
-	t, err := conversion.EnforcePtr(obj)
+	_, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return fmt.Errorf("obj is not pointer")
 	}
@@ -61,40 +60,13 @@ func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
 	//             cpu: "100m"
 	//         }
 	//     }
-	isEmptyDic := func(v *lua.LTable) bool {
-		count := 0
-		v.ForEach(func(lua.LValue, lua.LValue) {
-			count++
-		})
-		return count == 0
-	}
-
-	var walkValue func(v lua.LValue)
-	walkValue = func(v lua.LValue) {
-		if t, ok := v.(*lua.LTable); ok {
-			t.ForEach(func(key lua.LValue, value lua.LValue) {
-				if tt, ok := value.(*lua.LTable); ok {
-					if isEmptyDic(tt) {
-						// set nil to delete key
-						t.RawSetH(key, lua.LNil)
-					} else {
-						walkValue(value)
-					}
-				}
-			})
-		}
-	}
-	walkValue(luaResult)
 
 	jsonBytes, err := luajson.Encode(luaResult)
 	if err != nil {
 		return fmt.Errorf("json Encode obj eroor %v", err)
 	}
 
-	//  for lua an empty object by json encode be [] not {}
-	if t.Kind() == reflect.Struct && len(jsonBytes) > 1 && jsonBytes[0] == '[' {
-		jsonBytes[0], jsonBytes[len(jsonBytes)-1] = '{', '}'
-	}
+	jsonBytes = bytes.Replace(jsonBytes, []byte("[]"), []byte("{}"), -1)
 
 	err = json.Unmarshal(jsonBytes, obj)
 	if err != nil {

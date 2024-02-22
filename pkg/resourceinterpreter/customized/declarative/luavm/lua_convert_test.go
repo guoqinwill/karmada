@@ -66,7 +66,7 @@ func TestConvertLuaResultInto(t *testing.T) {
 				obj:       &[]string{},
 			},
 			wantErr: false,
-			want:    &[]string{},
+			want:    &map[string]string{},
 		},
 		{
 			name: "non-empty table into slice",
@@ -111,6 +111,56 @@ func TestConvertLuaResultInto(t *testing.T) {
 			wantErr: false,
 			want: &fooStruct{
 				Bar: barStruct{Bar: "bar"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := ConvertLuaResultInto(tt.args.luaResult, tt.args.obj); (err != nil) != tt.wantErr {
+				t.Errorf("ConvertLuaResultInto() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got := tt.args.obj; !reflect.DeepEqual(tt.want, got) {
+				t.Errorf("ConvertLuaResultInto() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvertLuaResultIntoV2(t *testing.T) {
+	type specStruct struct {
+		LifeCycle map[string]string
+		Replicas  string
+	}
+	type fooStructV2 struct {
+		Spec specStruct
+	}
+	type args struct {
+		luaResult lua.LValue
+		obj       interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+		want    interface{}
+	}{
+		{
+			name: "empty key",
+			args: args{
+				luaResult: func() lua.LValue {
+					bar := &lua.LTable{}
+					bar.RawSetH(lua.LString("LifeCycle"), &lua.LTable{})
+					bar.RawSetString("Replicas", lua.LString("3"))
+
+					v := &lua.LTable{}
+					v.RawSetString("Spec", bar)
+					return v
+				}(),
+				obj: &fooStructV2{},
+			},
+			wantErr: false,
+			want: &fooStructV2{
+				Spec: specStruct{LifeCycle: map[string]string{}, Replicas: "3"},
 			},
 		},
 	}

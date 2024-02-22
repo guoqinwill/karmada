@@ -132,6 +132,8 @@ func (o *objectWatcherImpl) retainClusterFields(desired, observed *unstructured.
 	// and be set by user in karmada-controller-plane.
 	util.RetainLabels(desired, observed)
 
+	klog.Infof("[DEBUG] desired before: %+v", desired)
+
 	if o.resourceInterpreter.HookEnabled(desired.GroupVersionKind(), configv1alpha1.InterpreterOperationRetain) {
 		return o.resourceInterpreter.Retain(desired, observed)
 	}
