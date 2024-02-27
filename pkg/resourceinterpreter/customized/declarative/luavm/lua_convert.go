@@ -17,14 +17,28 @@ limitations under the License.
 package luavm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 
 	lua "github.com/yuin/gopher-lua"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/klog/v2"
 	luajson "layeh.com/gopher-json"
 )
+
+// luajsonFormatRegexp a regular expression which used to format the string encoded by luajson.
+var luajsonFormatRegexp *regexp.Regexp
+
+func init() {
+	var err error
+	luajsonFormatRegexp, err = regexp.Compile(`"([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]":\[]`)
+	if err != nil {
+		klog.Errorf("Failed to init regexp, invalid regexp: %+v", err)
+	}
+}
 
 // ConvertLuaResultInto convert lua result to obj
 func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
@@ -47,49 +61,41 @@ func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
 	// ReplicaRequirements object.
 	//
 	// Here we handle it as follows:
-	//   1. Walk the object (lua table), delete the key with empty value (`nodeClaim` in this example):
+	//   1. Encode the object with luajson to be:
+	//     {"nodeClaim": [], "resourceRequest": {"cpu": "100m"}}
+	//   2. replace the empty value from `[]` to `{}` (`nodeClaim` in this example)
+	//     {"nodeClaim": {}, "resourceRequest": {"cpu": "100m"}}
+	//   3. Finally, unmarshal the new json to object, get
 	//     {
+	//         nodeClaim: {},
 	//         resourceRequest: {
 	//             cpu: "100m"
 	//         }
 	//     }
-	//   2. Encode the object with luajson to be:
-	//     {"resourceRequest": {"cpu": "100m"}}
-	//   4. Finally, unmarshal the new json to object, get
-	//     {
-	//         resourceRequest: {
-	//             cpu: "100m"
-	//         }
-	//     }
-	isEmptyDic := func(v *lua.LTable) bool {
-		count := 0
-		v.ForEach(func(lua.LValue, lua.LValue) {
-			count++
-		})
-		return count == 0
-	}
-
-	var walkValue func(v lua.LValue)
-	walkValue = func(v lua.LValue) {
-		if t, ok := v.(*lua.LTable); ok {
-			t.ForEach(func(key lua.LValue, value lua.LValue) {
-				if tt, ok := value.(*lua.LTable); ok {
-					if isEmptyDic(tt) {
-						// set nil to delete key
-						t.RawSetH(key, lua.LNil)
-					} else {
-						walkValue(value)
-					}
-				}
-			})
-		}
-	}
-	walkValue(luaResult)
-
+	//
+	//  Notes: don't worry that the value of a field is `[]`, and it originally represents an empty slice.
+	//  Because this situation will not appear in the following `jsonBytes`.
+	//  Supposing the value of a field is originally an empty slice:
+	//    1. if this field is omitempty, this empty slice value and its key will both been removed in marshal process.
+	//       e.g: `Rules.Resources` field in `Role` Type.
+	//    2. if this field is not omitempty, but required, empty slice is impossible to be created.
+	//       e.g: `Rules.Verbs` field in `Role` Type.
+	//    3. if this field is not omitempty, but optional, it has been verified also be removed in `jsonBytes`.
+	//       e.g: `Rules` field in `Role` Type.
 	jsonBytes, err := luajson.Encode(luaResult)
 	if err != nil {
-		return fmt.Errorf("json Encode obj eroor %v", err)
+		return fmt.Errorf("json Encode obj error %v", err)
 	}
+
+	// Only if `[]` is the value of a field, it will be converted to `{}`,
+	// otherwise, for example, if `[]` is a substring in a string value, it needs to be ignored
+	//
+	// e.g: assuming the given jsonBytes is: {"one-field":[],"one-label":"\"hello\":[]"}
+	// it is expected to convert to: {"one-field":{},"one-label":"\"hello\":[]"}
+	jsonBytes = luajsonFormatRegexp.ReplaceAllFunc(jsonBytes, func(src []byte) []byte {
+		dst := bytes.ReplaceAll(src, []byte(`[]`), []byte(`{}`))
+		return dst
+	})
 
 	//  for lua an empty object by json encode be [] not {}
 	if t.Kind() == reflect.Struct && len(jsonBytes) > 1 && jsonBytes[0] == '[' {

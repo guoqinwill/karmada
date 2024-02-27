@@ -63,6 +63,7 @@ spec:
             containers:
                 - image: nginx:alpine
                   name: nginx
+status: {}
 `,
 		},
 		{
@@ -78,6 +79,7 @@ spec:
 3
 ---
 # [2/2] requires:
+nodeClaim: {}
 resourceRequest:
     cpu: 100m
 `,

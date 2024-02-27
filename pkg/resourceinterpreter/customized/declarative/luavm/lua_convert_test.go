@@ -31,6 +31,15 @@ func TestConvertLuaResultInto(t *testing.T) {
 		Bar barStruct
 	}
 
+	type specStruct struct {
+		Label      map[string]string
+		LifeCycle  map[string]string
+		OtherField string
+	}
+	type foolStruct struct {
+		Spec specStruct
+	}
+
 	type args struct {
 		luaResult lua.LValue
 		obj       interface{}
@@ -111,6 +120,33 @@ func TestConvertLuaResultInto(t *testing.T) {
 			wantErr: false,
 			want: &fooStruct{
 				Bar: barStruct{Bar: "bar"},
+			},
+		},
+		{
+			name: "convert empty lua table from [] to {}",
+			args: args{
+				luaResult: func() lua.LValue {
+					label := &lua.LTable{}
+					label.RawSetString("one-label", lua.LString(`\"hello\":[]`))
+
+					spec := &lua.LTable{}
+					spec.RawSetH(lua.LString("Label"), label)
+					spec.RawSetH(lua.LString("LifeCycle"), &lua.LTable{})
+					spec.RawSetString("OtherField", lua.LString("test"))
+
+					v := &lua.LTable{}
+					v.RawSetString("Spec", spec)
+					return v
+				}(),
+				obj: &foolStruct{},
+			},
+			wantErr: false,
+			want: &foolStruct{
+				Spec: specStruct{
+					Label:      map[string]string{"one-label": `\"hello\":[]`},
+					LifeCycle:  map[string]string{},
+					OtherField: "test",
+				},
 			},
 		},
 	}
