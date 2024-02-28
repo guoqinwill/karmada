@@ -17,7 +17,9 @@ limitations under the License.
 package luavm
 
 import (
+	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 
 	"github.com/yuin/gluamapper"
 	lua "github.com/yuin/gopher-lua"
@@ -25,7 +27,11 @@ import (
 
 // ConvertLuaResultInto convert lua result to obj
 func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
-	return gluamapper.Map(luaResult.(*lua.LTable), obj)
+	err := gluamapper.Map(luaResult.(*lua.LTable), obj)
+	klog.Infof("[DEBUG] obj: %+v, err: %+v", obj, err)
+	buf, err2 := json.Marshal(obj)
+	klog.Infof("[DEBUG] json: %s, err: %+v", buf, err2)
+	return err
 }
 
 // ConvertLuaResultToInt convert lua result to int.
