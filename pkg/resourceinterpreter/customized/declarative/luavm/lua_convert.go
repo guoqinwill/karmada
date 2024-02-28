@@ -87,6 +87,8 @@ func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
 		return fmt.Errorf("json Encode obj error %v", err)
 	}
 
+	klog.Infof("[DEBUG] jsonBytes: %s", jsonBytes)
+
 	// Only if `[]` is the value of a field, it will be converted to `{}`,
 	// otherwise, for example, if `[]` is a substring in a string value, it needs to be ignored
 	//
@@ -101,6 +103,8 @@ func ConvertLuaResultInto(luaResult lua.LValue, obj interface{}) error {
 	if t.Kind() == reflect.Struct && len(jsonBytes) > 1 && jsonBytes[0] == '[' {
 		jsonBytes[0], jsonBytes[len(jsonBytes)-1] = '{', '}'
 	}
+
+	klog.Infof("[DEBUG] jsonBytes after convert: %s", jsonBytes)
 
 	err = json.Unmarshal(jsonBytes, obj)
 	if err != nil {
