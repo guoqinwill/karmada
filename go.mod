@@ -22,6 +22,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.3
 	github.com/vektra/mockery/v2 v2.10.0
+	github.com/yuin/gluamapper v0.0.0-20150323120927-d836955830e7
 	github.com/yuin/gopher-lua v0.0.0-20220504180219-658193537a64
 	go.uber.org/mock v0.4.0
 	golang.org/x/net v0.19.0
