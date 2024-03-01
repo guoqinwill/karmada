@@ -140,7 +140,7 @@ func (vm *VM) GetReplicas(obj *unstructured.Unstructured, script string) (replic
 	replicaRequirementResult := results[1]
 	requires = &workv1alpha2.ReplicaRequirements{}
 	if replicaRequirementResult.Type() == lua.LTTable {
-		err = ConvertLuaResultInto(replicaRequirementResult, requires)
+		err = ConvertLuaResultToStruct(replicaRequirementResult.(*lua.LTable), requires)
 		if err != nil {
 			klog.Errorf("ConvertLuaResultToReplicaRequirements err %v", err.Error())
 			return 0, nil, err
@@ -162,9 +162,8 @@ func (vm *VM) ReviseReplica(object *unstructured.Unstructured, replica int64, sc
 	}
 
 	luaResult := results[0]
-	reviseReplicaResult := &unstructured.Unstructured{}
 	if luaResult.Type() == lua.LTTable {
-		err := ConvertLuaResultInto(luaResult, reviseReplicaResult)
+		reviseReplicaResult, err := ConvertLuaResultToUnstruct(luaResult.(*lua.LTable), []*unstructured.Unstructured{object})
 		if err != nil {
 			return nil, err
 		}
@@ -235,9 +234,8 @@ func (vm *VM) Retain(desired *unstructured.Unstructured, observed *unstructured.
 	}
 
 	luaResult := results[0]
-	retainResult := &unstructured.Unstructured{}
 	if luaResult.Type() == lua.LTTable {
-		err := ConvertLuaResultInto(luaResult, retainResult)
+		retainResult, err := ConvertLuaResultToUnstruct(luaResult.(*lua.LTable), []*unstructured.Unstructured{desired, observed})
 		if err != nil {
 			return nil, err
 		}
@@ -254,9 +252,8 @@ func (vm *VM) AggregateStatus(object *unstructured.Unstructured, items []workv1a
 	}
 
 	luaResult := results[0]
-	aggregateStatus := &unstructured.Unstructured{}
 	if luaResult.Type() == lua.LTTable {
-		err := ConvertLuaResultInto(luaResult, aggregateStatus)
+		aggregateStatus, err := ConvertLuaResultToUnstruct(luaResult.(*lua.LTable), []*unstructured.Unstructured{object})
 		if err != nil {
 			return nil, err
 		}
@@ -293,7 +290,7 @@ func (vm *VM) ReflectStatus(object *unstructured.Unstructured, script string) (s
 	}
 
 	status = &runtime.RawExtension{}
-	err = ConvertLuaResultInto(luaStatusResult, status)
+	err = ConvertLuaResultToStruct(luaStatusResult.(*lua.LTable), status)
 	return status, err
 }
 
@@ -309,7 +306,7 @@ func (vm *VM) GetDependencies(object *unstructured.Unstructured, script string) 
 	if luaResult.Type() != lua.LTTable {
 		return nil, fmt.Errorf("expect the returned requires type is table but got %s", luaResult.Type())
 	}
-	err = ConvertLuaResultInto(luaResult, &dependencies)
+	err = ConvertLuaResultToStruct(luaResult.(*lua.LTable), &dependencies)
 	return
 }
 
