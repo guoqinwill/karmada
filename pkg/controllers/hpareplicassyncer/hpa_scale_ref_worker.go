@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
+
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,9 +36,9 @@ import (
 type labelEventKind int
 
 const (
-	// addLabelEvent refer to adding util.RetainReplicasLabel to resource scaled by HPA
+	// addLabelEvent refer to adding util.FieldsRetainWhenConflict to resource scaled by HPA
 	addLabelEvent labelEventKind = iota
-	// deleteLabelEvent refer to deleting util.RetainReplicasLabel from resource scaled by HPA
+	// deleteLabelEvent refer to deleting util.FieldsRetainWhenConflict from resource scaled by HPA
 	deleteLabelEvent
 )
 
@@ -68,8 +70,18 @@ func (r *HPAReplicasSyncer) reconcileScaleRef(key util.QueueKey) (err error) {
 	return err
 }
 
+var gvkToReplicaFields = map[schema.GroupVersionKind]string{
+	(&appsv1.Deployment{}).GroupVersionKind(): "spec.replicas",
+}
+
 func (r *HPAReplicasSyncer) addHPALabelToScaleRef(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) error {
 	targetGVK := schema.FromAPIVersionAndKind(hpa.Spec.ScaleTargetRef.APIVersion, hpa.Spec.ScaleTargetRef.Kind)
+	replicaField, ok := gvkToReplicaFields[targetGVK]
+	if !ok {
+		klog.Warningf("skip add hpa label to scale ref for unknown replica fields for %+v", targetGVK)
+		return nil
+	}
+
 	mapping, err := r.RESTMapper.RESTMapping(targetGVK.GroupKind(), targetGVK.Version)
 	if err != nil {
 		return fmt.Errorf("unable to recognize scale ref resource, %s/%v, err: %+v", hpa.Namespace, hpa.Spec.ScaleTargetRef, err)
@@ -86,7 +98,7 @@ func (r *HPAReplicasSyncer) addHPALabelToScaleRef(ctx context.Context, hpa *auto
 
 	// use patch is better than update, when modification occur after get, patch can still success while update can not
 	newScaleRef := scaleRef.DeepCopy()
-	util.MergeLabel(newScaleRef, util.RetainReplicasLabel, util.RetainReplicasValue)
+	util.MergeLabel(newScaleRef, util.FieldsRetainWhenConflict, replicaField)
 	patchBytes, err := helper.GenMergePatch(scaleRef, newScaleRef)
 	if err != nil {
 		return fmt.Errorf("failed to gen merge patch (%s/%v), err: %+v", hpa.Namespace, hpa.Spec.ScaleTargetRef, err)
@@ -112,6 +124,12 @@ func (r *HPAReplicasSyncer) addHPALabelToScaleRef(ctx context.Context, hpa *auto
 
 func (r *HPAReplicasSyncer) deleteHPALabelFromScaleRef(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) error {
 	targetGVK := schema.FromAPIVersionAndKind(hpa.Spec.ScaleTargetRef.APIVersion, hpa.Spec.ScaleTargetRef.Kind)
+	_, ok := gvkToReplicaFields[targetGVK]
+	if !ok {
+		klog.Warningf("skip delete hpa label from scale ref for unknown replica fields for %+v", targetGVK)
+		return nil
+	}
+
 	mapping, err := r.RESTMapper.RESTMapping(targetGVK.GroupKind(), targetGVK.Version)
 	if err != nil {
 		return fmt.Errorf("unable to recognize scale ref resource, %s/%v, err: %+v", hpa.Namespace, hpa.Spec.ScaleTargetRef, err)
@@ -128,7 +146,7 @@ func (r *HPAReplicasSyncer) deleteHPALabelFromScaleRef(ctx context.Context, hpa 
 
 	// use patch is better than update, when modification occur after get, patch can still success while update can not
 	newScaleRef := scaleRef.DeepCopy()
-	util.RemoveLabels(newScaleRef, util.RetainReplicasLabel)
+	util.RemoveLabels(newScaleRef, util.FieldsRetainWhenConflict)
 	patchBytes, err := helper.GenMergePatch(scaleRef, newScaleRef)
 	if err != nil {
 		return fmt.Errorf("failed to gen merge patch (%s/%v), err: %+v", hpa.Namespace, hpa.Spec.ScaleTargetRef, err)

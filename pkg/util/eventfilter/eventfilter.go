@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/karmada-io/karmada/pkg/util"
+
 	policyv1alpha1 "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1"
 )
 
@@ -54,6 +56,13 @@ func ResourceChangeByKarmada(oldObj, newObj *unstructured.Unstructured) bool {
 	removeFieldsChangedByKarmada(oldBackup, newBackup)
 
 	return reflect.DeepEqual(oldBackup, newBackup)
+}
+
+// WhetherSkipReconcile skip reconcile process when value of label `SkipReconcileAt` changed.
+func WhetherSkipReconcile(oldObj, newObj *unstructured.Unstructured) bool {
+	oldValue := util.GetLabelValue(oldObj.GetLabels(), util.SkipReconcileAt)
+	newValue := util.GetLabelValue(newObj.GetLabels(), util.SkipReconcileAt)
+	return oldValue != newValue
 }
 
 // removeIgnoredFields Remove the status and some system defined mutable fields in metadata, including managedFields and resourceVersion.

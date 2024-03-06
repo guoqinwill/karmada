@@ -58,10 +58,11 @@ const (
 	// EndpointSliceDispatchControllerLabelValue indicates the endpointSlice are controlled by Karmada
 	EndpointSliceDispatchControllerLabelValue = "endpointslice-dispatch-controller.karmada.io"
 
-	// RetainReplicasLabel is a reserved label to indicate whether the replicas should be retained. e.g:
-	// resourcetemplate.karmada.io/retain-replicas: true   // with value `true` indicates retain
-	// resourcetemplate.karmada.io/retain-replicas: false  // with value `false` and others, indicates not retain
-	RetainReplicasLabel = "resourcetemplate.karmada.io/retain-replicas"
+	// FieldsRetainWhenConflict is a reserved label to indicate whether the replicas should be retained. e.g:
+	FieldsRetainWhenConflict = "resourcetemplate.karmada.io/fields-retain-when-conflict"
+
+	// SkipReconcileAt indicates skip reconcile process explicitly by modifing its value, which is in current time format.
+	SkipReconcileAt = "resourcetemplate.karmada.io/skip-reconcile-at"
 
 	// ResourceTemplateClaimedByLabel is added to the ResourceTemplate, indicating which resource is in charge of propagating the ResourceTemplate.
 	ResourceTemplateClaimedByLabel = "resourcetemplate.karmada.io/claimed-by"
@@ -74,11 +75,13 @@ const (
 	// ManagedByKarmadaLabelValue indicates that resources are managed by karmada controllers.
 	ManagedByKarmadaLabelValue = "true"
 
-	// RetainReplicasValue is an optional value of RetainReplicasLabel, indicating retain
-	RetainReplicasValue = "true"
-
 	// PropagationInstructionSuppressed indicates that the resource should not be propagated.
 	PropagationInstructionSuppressed = "suppressed"
+)
+
+const (
+	RetainFieldsArraySeparator = ","
+	RetainFieldNestedSeparator = "."
 )
 
 // Define annotations used by karmada system.
@@ -222,4 +225,14 @@ const (
 var (
 	// EndpointSliceGVK is the GroupVersionKind of K8s native EndpointSlice.
 	EndpointSliceGVK = discoveryv1.SchemeGroupVersion.WithKind("EndpointSlice")
+)
+
+// ObjectWatcherCaller the caller of ObjectWatcher
+type ObjectWatcherCaller string
+
+const (
+	// WorkStatusController refers to work_status_controller component
+	WorkStatusController ObjectWatcherCaller = "WorkStatusController"
+	// ExecutionController refers to execution_controller component
+	ExecutionController ObjectWatcherCaller = "ExecutionController"
 )

@@ -264,7 +264,7 @@ func (c *Controller) tryCreateOrUpdateWorkload(clusterName string, workload *uns
 		return nil
 	}
 
-	err = c.ObjectWatcher.Update(clusterName, workload, clusterObj)
+	err = c.ObjectWatcher.Update(clusterName, workload, clusterObj, util.ExecutionController)
 	if err != nil {
 		klog.Errorf("Failed to update resource in the given member cluster %s, err is %v", clusterName, err)
 		return err

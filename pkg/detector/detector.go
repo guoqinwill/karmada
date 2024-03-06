@@ -351,11 +351,17 @@ func (d *ResourceDetector) OnUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	resourceChangeByKarmada := eventfilter.ResourceChangeByKarmada(unstructuredOldObj, unstructuredNewObj)
+	if eventfilter.WhetherSkipReconcile(unstructuredOldObj, unstructuredNewObj) {
+		klog.V(4).Infof("Ignore update event of object (kind=%s, %s/%s) for explicitly labeled skip reconcile",
+			unstructuredOldObj.GetKind(), unstructuredOldObj.GetNamespace(), unstructuredOldObj.GetName())
+		return
+	}
+
+	changeByKarmada := eventfilter.ResourceChangeByKarmada(unstructuredOldObj, unstructuredNewObj)
 
 	resourceItem := ResourceItem{
 		Obj:                     newRuntimeObj,
-		ResourceChangeByKarmada: resourceChangeByKarmada,
+		ResourceChangeByKarmada: changeByKarmada,
 	}
 
 	d.Processor.Enqueue(resourceItem)

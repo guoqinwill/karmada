@@ -237,7 +237,7 @@ func (c *WorkStatusController) syncWorkStatus(key util.QueueKey) error {
 	}
 
 	if needUpdate {
-		if err := c.ObjectWatcher.Update(clusterName, desiredObj, observedObj); err != nil {
+		if err := c.ObjectWatcher.Update(clusterName, desiredObj, observedObj, util.WorkStatusController); err != nil {
 			klog.Errorf("Update %s failed: %v", fedKey.String(), err)
 			return err
 		}

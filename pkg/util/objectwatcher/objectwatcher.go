@@ -19,6 +19,7 @@ package objectwatcher
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +44,7 @@ import (
 // ObjectWatcher manages operations for object dispatched to member clusters.
 type ObjectWatcher interface {
 	Create(clusterName string, desireObj *unstructured.Unstructured) error
-	Update(clusterName string, desireObj, clusterObj *unstructured.Unstructured) error
+	Update(clusterName string, desireObj, clusterObj *unstructured.Unstructured, caller util.ObjectWatcherCaller) error
 	Delete(clusterName string, desireObj *unstructured.Unstructured) error
 	NeedsUpdate(clusterName string, desiredObj, clusterObj *unstructured.Unstructured) (bool, error)
 }
@@ -112,7 +113,7 @@ func (o *objectWatcherImpl) Create(clusterName string, desireObj *unstructured.U
 	return nil
 }
 
-func (o *objectWatcherImpl) retainClusterFields(desired, observed *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (o *objectWatcherImpl) retainClusterFields(desired, observed *unstructured.Unstructured, caller util.ObjectWatcherCaller) (*unstructured.Unstructured, error) {
 	// Pass the same ResourceVersion as in the cluster object for update operation, otherwise operation will fail.
 	desired.SetResourceVersion(observed.GetResourceVersion())
 
@@ -132,6 +133,10 @@ func (o *objectWatcherImpl) retainClusterFields(desired, observed *unstructured.
 	// and be set by user in karmada-controller-plane.
 	util.RetainLabels(desired, observed)
 
+	if caller == util.WorkStatusController {
+		o.retainSpecifiedFieldsWhenConflict(desired, observed)
+	}
+
 	if o.resourceInterpreter.HookEnabled(desired.GroupVersionKind(), configv1alpha1.InterpreterOperationRetain) {
 		return o.resourceInterpreter.Retain(desired, observed)
 	}
@@ -139,7 +144,7 @@ func (o *objectWatcherImpl) retainClusterFields(desired, observed *unstructured.
 	return desired, nil
 }
 
-func (o *objectWatcherImpl) Update(clusterName string, desireObj, clusterObj *unstructured.Unstructured) error {
+func (o *objectWatcherImpl) Update(clusterName string, desireObj, clusterObj *unstructured.Unstructured, caller util.ObjectWatcherCaller) error {
 	updateAllowed := o.allowUpdate(clusterName, desireObj, clusterObj)
 	if !updateAllowed {
 		// The existing resource is not managed by Karmada, and no conflict resolution found, avoid updating the existing resource by default.
@@ -160,7 +165,7 @@ func (o *objectWatcherImpl) Update(clusterName string, desireObj, clusterObj *un
 		return err
 	}
 
-	desireObj, err = o.retainClusterFields(desireObj, clusterObj)
+	desireObj, err = o.retainClusterFields(desireObj, clusterObj, caller)
 	if err != nil {
 		klog.Errorf("Failed to retain fields for resource(kind=%s, %s/%s) in cluster %s: %v", clusterObj.GetKind(), clusterObj.GetNamespace(), clusterObj.GetName(), clusterName, err)
 		return err
@@ -298,4 +303,28 @@ func (o *objectWatcherImpl) allowUpdate(clusterName string, desiredObj, clusterO
 		desiredObj.GetKind(), desiredObj.GetNamespace(), desiredObj.GetName(), clusterName, workv1alpha2.ResourceConflictResolutionAnnotation,
 	)
 	return false
+}
+
+func (o *objectWatcherImpl) retainSpecifiedFieldsWhenConflict(desired, observed *unstructured.Unstructured) {
+	value, labelExist := desired.GetLabels()[util.FieldsRetainWhenConflict]
+	if !labelExist {
+		return
+	}
+
+	fields := strings.Split(value, util.RetainFieldsArraySeparator)
+	for _, field := range fields {
+		nestedField := strings.Split(field, util.RetainFieldNestedSeparator)
+
+		observedValue, exist, err := unstructured.NestedInt64(observed.Object, nestedField...)
+		if err != nil || !exist {
+			klog.Errorf("failed to get %s from observed object: %s %s/%s", field, observed.GetKind(), observed.GetNamespace(), observed.GetName())
+			continue
+		}
+
+		err = unstructured.SetNestedField(desired.Object, observedValue, nestedField...)
+		if err != nil {
+			klog.Errorf("failed to set spec.replicas to %s %s/%s", desired.GetKind(), desired.GetNamespace(), desired.GetName())
+			continue
+		}
+	}
 }
