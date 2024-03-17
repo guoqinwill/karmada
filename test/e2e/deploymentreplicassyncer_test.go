@@ -57,22 +57,13 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 		hpa = helper.NewHPA(namespace, hpaName, deploymentName)
 		hpa.Spec.MinReplicas = pointer.Int32(2)
 		policy = helper.NewPropagationPolicy(namespace, policyName, []policyv1alpha1.ResourceSelector{
-			{
-				APIVersion: deployment.APIVersion,
-				Kind:       deployment.Kind,
-				Name:       deployment.Name,
-			},
-			{
-				APIVersion: hpa.APIVersion,
-				Kind:       hpa.Kind,
-				Name:       hpa.Name,
-			},
+			{APIVersion: deployment.APIVersion, Kind: deployment.Kind, Name: deployment.Name},
+			{APIVersion: hpa.APIVersion, Kind: hpa.Kind, Name: hpa.Name},
 		}, policyv1alpha1.Placement{
 			ClusterAffinity: &policyv1alpha1.ClusterAffinity{
 				ClusterNames: targetClusters,
 			},
 		})
-
 	})
 
 	ginkgo.JustBeforeEach(func() {
@@ -88,30 +79,15 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 		})
 	})
 
-	ginkgo.Context("deployment replicas syncer when policy is Divided schedule type", func() {
+	ginkgo.Context("when policy is Divided schedule type, and replicas is larger than cluster number", func() {
 		ginkgo.BeforeEach(func() {
-			// static weight 1:1 policy
-			staticWeightList := make([]policyv1alpha1.StaticClusterWeight, 0)
-			for _, clusterName := range framework.ClusterNames()[0:2] {
-				staticWeightList = append(staticWeightList, policyv1alpha1.StaticClusterWeight{
-					TargetCluster: policyv1alpha1.ClusterAffinity{ClusterNames: []string{clusterName}},
-					Weight:        1,
-				})
-			}
-			policy.Spec.Placement.ReplicaScheduling = &policyv1alpha1.ReplicaSchedulingStrategy{
-				ReplicaSchedulingType:     policyv1alpha1.ReplicaSchedulingTypeDivided,
-				ReplicaDivisionPreference: policyv1alpha1.ReplicaDivisionPreferenceWeighted,
-				WeightPreference: &policyv1alpha1.ClusterPreferences{
-					StaticWeightList: staticWeightList,
-				},
-			}
+			policy.Spec.Placement.ReplicaScheduling = helper.NewStaticWeightPolicyStrategy(targetClusters, []int64{1, 1})
+			deployment.Spec.Replicas = pointer.Int32(4)
 		})
 
 		// Case 1: Deployment(replicas=4) | Policy(Divided, two clusters 1:1) | HPA(minReplicas=2)
 		// Expected result: hpa scaling can take effect in updating spec, while manually modify not.
 		ginkgo.It("general case combined hpa scaling and manually modify in Divided type", func() {
-			deployment.Spec.Replicas = pointer.Int32(4)
-
 			ginkgo.By("step1: propagate 4 replicas to two clusters", func() {
 				assertDeploymentWorkloadReplicas(namespace, deploymentName, targetClusters, []int32{2, 2})
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 4)
@@ -135,12 +111,18 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 6)
 			})
 		})
+	})
+
+	ginkgo.Context("when policy is Divided schedule type, and replicas from 1 to 2", func() {
+		ginkgo.BeforeEach(func() {
+			policy.Spec.Placement.ReplicaScheduling = helper.NewStaticWeightPolicyStrategy(targetClusters, []int64{1, 1})
+			deployment.Spec.Replicas = pointer.Int32(1)
+			hpa.Spec.MinReplicas = pointer.Int32(1)
+		})
 
 		// Case 2: Deployment(replicas=1) | Policy(Divided, two clusters 1:1) | HPA(minReplicas=2)
 		// Expected result: manually modify can take effect in updating spec.
 		ginkgo.It("0/1 case, manually modify replicas from 1 to 2", func() {
-			deployment.Spec.Replicas = pointer.Int32(1)
-
 			ginkgo.By("step1: propagate 1 replicas to two clusters", func() {
 				assertDeploymentWorkloadReplicas(namespace, deploymentName, targetClusters, []int32{1, 0})
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 1)
@@ -152,12 +134,18 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 2)
 			})
 		})
+	})
+
+	ginkgo.Context("when policy is Divided schedule type, and replicas from 2 to 1", func() {
+		ginkgo.BeforeEach(func() {
+			policy.Spec.Placement.ReplicaScheduling = helper.NewStaticWeightPolicyStrategy(targetClusters, []int64{1, 1})
+			deployment.Spec.Replicas = pointer.Int32(2)
+			hpa.Spec.MinReplicas = pointer.Int32(1)
+		})
 
 		// Case 3: Deployment(replicas=2) | Policy(Divided, two clusters 1:1) | HPA(minReplicas=2)
 		// Expected result: manually modify can take effect in updating spec.
 		ginkgo.It("0/1 case, manually modify replicas from 2 to 1", func() {
-			deployment.Spec.Replicas = pointer.Int32(2)
-
 			ginkgo.By("step1: propagate 2 replicas to two clusters", func() {
 				assertDeploymentWorkloadReplicas(namespace, deploymentName, targetClusters, []int32{1, 1})
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 2)
@@ -171,13 +159,14 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 		})
 	})
 
-	ginkgo.Context("deployment replicas syncer when policy is Duplicated schedule type", func() {
+	ginkgo.Context("when policy is Duplicated schedule type", func() {
+		ginkgo.BeforeEach(func() {
+			deployment.Spec.Replicas = pointer.Int32(2)
+		})
 
 		// Case 4: Deployment(replicas=2) | Policy(Duplicated, two clusters) | HPA(minReplicas=2)
 		// Expected result: hpa scaling not take effect in updating spec, manually modify spec have no action.
 		ginkgo.It("general case combined hpa scaling and manually modify in Duplicated type", func() {
-			deployment.Spec.Replicas = pointer.Int32(2)
-
 			ginkgo.By("step1: propagate each 2 replicas to two clusters", func() {
 				assertDeploymentWorkloadReplicas(namespace, deploymentName, targetClusters, []int32{2, 2})
 				assertDeploymentTemplateReplicas(namespace, deploymentName, 2)
@@ -208,8 +197,12 @@ var _ = ginkgo.Describe("deployment replicas syncer testing", func() {
 func assertDeploymentWorkloadReplicas(namespace, name string, clusters []string, expectedReplicas []int32) {
 	gomega.Expect(len(clusters)).Should(gomega.Equal(len(expectedReplicas)))
 	for i, cluster := range clusters {
+		if expectedReplicas[i] == 0 {
+			framework.WaitDeploymentDisappearOnCluster(cluster, namespace, name)
+			return
+		}
 		framework.WaitDeploymentPresentOnClustersFitWith([]string{cluster}, namespace, name, func(deployment *appsv1.Deployment) bool {
-			klog.Infof("in %s cluster, got: %d, expect: %d", cluster, *deployment.Spec.Replicas, expectedReplicas)
+			klog.Infof("in %s cluster, got: %d, expect: %d", cluster, *deployment.Spec.Replicas, expectedReplicas[i])
 			return *deployment.Spec.Replicas == expectedReplicas[i]
 		})
 	}
@@ -222,7 +215,7 @@ func assertDeploymentTemplateReplicas(namespace, name string, expectedSpecReplic
 		if err != nil {
 			return false
 		}
-		klog.Infof("got: %d, expect: %d", *deploymentExist.Spec.Replicas, expectedSpecReplicas)
+		klog.Infof("template spec replicas, got: %d, expect: %d", *deploymentExist.Spec.Replicas, expectedSpecReplicas)
 		return (*deploymentExist.Spec.Replicas == expectedSpecReplicas) && (deploymentExist.Generation == deploymentExist.Status.ObservedGeneration)
 	}, time.Minute, pollInterval).Should(gomega.Equal(true))
 }
