@@ -68,6 +68,9 @@ const (
 
 	// ScaleSchedule means the replicas of binding object has been changed.
 	ScaleSchedule ScheduleType = "ScaleSchedule"
+
+	// ForceReschedule force reschedule
+	ForceReschedule ScheduleType = "ForceReschedule"
 )
 
 const (
@@ -357,6 +360,13 @@ func (s *Scheduler) doScheduleBinding(namespace, name string) (err error) {
 		metrics.BindingSchedule(string(ScaleSchedule), utilmetrics.DurationInSeconds(start), err)
 		return err
 	}
+	if rb.Spec.RescheduleTriggeredAt.After(rb.Status.RescheduledAt.Time) {
+		// explicitly specify that reschedule is required
+		klog.Infof("Reschedule ResourceBinding(%s/%s) as forceRescheduling specified", namespace, name)
+		err = s.scheduleResourceBinding(rb)
+		metrics.BindingSchedule(string(ForceReschedule), utilmetrics.DurationInSeconds(start), err)
+		return err
+	}
 	if rb.Spec.Replicas == 0 ||
 		rb.Spec.Placement.ReplicaSchedulingType() == policyv1alpha1.ReplicaSchedulingTypeDuplicated {
 		// Duplicated resources should always be scheduled. Note: non-workload is considered as duplicated
@@ -412,6 +422,13 @@ func (s *Scheduler) doScheduleClusterBinding(name string) (err error) {
 		klog.Infof("Reschedule ClusterResourceBinding(%s) as replicas scaled down or scaled up", name)
 		err = s.scheduleClusterResourceBinding(crb)
 		metrics.BindingSchedule(string(ScaleSchedule), utilmetrics.DurationInSeconds(start), err)
+		return err
+	}
+	if crb.Spec.RescheduleTriggeredAt.After(crb.Status.RescheduledAt.Time) {
+		// force rescheduling
+		klog.Infof("Start to schedule ClusterResourceBinding(%s) as forceRescheduling specified", name)
+		err = s.scheduleClusterResourceBinding(crb)
+		metrics.BindingSchedule(string(ForceReschedule), utilmetrics.DurationInSeconds(start), err)
 		return err
 	}
 	if crb.Spec.Replicas == 0 ||
@@ -770,6 +787,9 @@ func patchBindingStatusCondition(karmadaClient karmadaclientset.Interface, rb *w
 	// will succeed eventually.
 	if newScheduledCondition.Status == metav1.ConditionTrue {
 		updateRB.Status.SchedulerObservedGeneration = rb.Generation
+		if newScheduledCondition.Type == workv1alpha2.Scheduled {
+			updateRB.Status.RescheduledAt = metav1.Now()
+		}
 	}
 
 	if reflect.DeepEqual(rb.Status, updateRB.Status) {
@@ -819,6 +839,9 @@ func patchClusterBindingStatusCondition(karmadaClient karmadaclientset.Interface
 	// will succeed eventually.
 	if newScheduledCondition.Status == metav1.ConditionTrue {
 		updateCRB.Status.SchedulerObservedGeneration = crb.Generation
+		if newScheduledCondition.Type == workv1alpha2.Scheduled {
+			updateCRB.Status.RescheduledAt = metav1.Now()
+		}
 	}
 
 	if reflect.DeepEqual(crb.Status, updateCRB.Status) {
