@@ -1,0 +1,142 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: scheduletriggers.policy.karmada.io
+spec:
+  group: policy.karmada.io
+  names:
+    categories:
+    - karmada-io
+    kind: ScheduleTrigger
+    listKind: ScheduleTriggerList
+    plural: scheduletriggers
+    singular: scheduletrigger
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: "ScheduleTrigger represents the desired behavior and status of
+          a job which can enforces a rescheduling. \n Notes: make sure the clocks
+          of controller-manager and scheduler are synchronized when using this API."
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec represents the specification of the desired behavior
+              of ScheduleTrigger.
+            properties:
+              autoCleanAfterSeconds:
+                default: 60
+                description: AutoCleanAfterMinutes specified the time in minutes when
+                  to clean up current ScheduleTrigger. When time up, the current object
+                  will be deleted, no matter whether executed success. Defaults to
+                  value 60, and value 0 means never do auto clean.
+                type: integer
+              retryAfterSeconds:
+                default: 3
+                description: RetryAfterSeconds specified the time interval in seconds
+                  to retry when part of the target resource triggering schedule failed.
+                  Defaults to value 3, and value 0 means retry immediately.
+                type: integer
+              targetRefPolicy:
+                description: TargetRefPolicy used to select batch of resources managed
+                  by certain policies.
+                items:
+                  description: TargetRefPolicy the resources bound policy will be
+                    selected.
+                  properties:
+                    name:
+                      description: Name of the target policy.
+                      type: string
+                    namespace:
+                      description: Namespace of the target policy. Default is empty,
+                        which means it is a cluster propagation policy.
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              targetRefResource:
+                description: TargetRefResource used to select resources.
+                items:
+                  description: TargetRefResource the resource will be selected.
+                  properties:
+                    apiVersion:
+                      description: APIVersion represents the API version of the target
+                        resource.
+                      type: string
+                    kind:
+                      description: Kind represents the Kind of the target resource.
+                      type: string
+                    name:
+                      description: Name of the target resource.
+                      type: string
+                    namespace:
+                      description: Namespace of the target resource. Default is empty,
+                        which means it is a non-namespacescoped resource.
+                      type: string
+                  required:
+                  - apiVersion
+                  - kind
+                  - name
+                  type: object
+                type: array
+            type: object
+          status:
+            description: Status represents the status of ScheduleTrigger.
+            properties:
+              failedResourceList:
+                description: FailedResourceList the list of trigger failed resources.
+                items:
+                  description: FailedResource trigger failed resource and its failure
+                    reason.
+                  properties:
+                    apiVersion:
+                      description: APIVersion represents the API version of the target
+                        resource.
+                      type: string
+                    failReason:
+                      description: FailReason the reason of resource triggered failed.
+                      type: string
+                    kind:
+                      description: Kind represents the Kind of the target resource.
+                      type: string
+                    name:
+                      description: Name of the target resource.
+                      type: string
+                    namespace:
+                      description: Namespace of the target resource. Default is empty,
+                        which means it is a non-namespacescoped resource.
+                      type: string
+                  required:
+                  - apiVersion
+                  - kind
+                  - name
+                  type: object
+                type: array
+              phase:
+                default: Running
+                description: Phase represents the specific extent to which the task
+                  has been executed. Valid options are "Running", "Failed" and "Success",
+                  Defaults to "Running".
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true

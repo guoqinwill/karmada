@@ -27,3 +27,5 @@ type FederatedResourceQuotaExpansion interface{}
 type OverridePolicyExpansion interface{}
 
 type PropagationPolicyExpansion interface{}
+
+type ScheduleTriggerExpansion interface{}

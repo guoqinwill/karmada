@@ -33,6 +33,7 @@ type PolicyV1alpha1Interface interface {
 	FederatedResourceQuotasGetter
 	OverridePoliciesGetter
 	PropagationPoliciesGetter
+	ScheduleTriggersGetter
 }
 
 // PolicyV1alpha1Client is used to interact with features provided by the policy.karmada.io group.
@@ -58,6 +59,10 @@ func (c *PolicyV1alpha1Client) OverridePolicies(namespace string) OverridePolicy
 
 func (c *PolicyV1alpha1Client) PropagationPolicies(namespace string) PropagationPolicyInterface {
 	return newPropagationPolicies(c, namespace)
+}
+
+func (c *PolicyV1alpha1Client) ScheduleTriggers() ScheduleTriggerInterface {
+	return newScheduleTriggers(c)
 }
 
 // NewForConfig creates a new PolicyV1alpha1Client for the given config.

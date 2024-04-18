@@ -100,6 +100,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterQuotaStatus":                          schema_pkg_apis_policy_v1alpha1_ClusterQuotaStatus(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.CommandArgsOverrider":                        schema_pkg_apis_policy_v1alpha1_CommandArgsOverrider(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.DecisionConditions":                          schema_pkg_apis_policy_v1alpha1_DecisionConditions(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailedResource":                              schema_pkg_apis_policy_v1alpha1_FailedResource(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailoverBehavior":                            schema_pkg_apis_policy_v1alpha1_FailoverBehavior(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FederatedResourceQuota":                      schema_pkg_apis_policy_v1alpha1_FederatedResourceQuota(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FederatedResourceQuotaList":                  schema_pkg_apis_policy_v1alpha1_FederatedResourceQuotaList(ref),
@@ -121,9 +122,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ReplicaSchedulingStrategy":                   schema_pkg_apis_policy_v1alpha1_ReplicaSchedulingStrategy(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ResourceSelector":                            schema_pkg_apis_policy_v1alpha1_ResourceSelector(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.RuleWithCluster":                             schema_pkg_apis_policy_v1alpha1_RuleWithCluster(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTrigger":                             schema_pkg_apis_policy_v1alpha1_ScheduleTrigger(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerList":                         schema_pkg_apis_policy_v1alpha1_ScheduleTriggerList(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerSpec":                         schema_pkg_apis_policy_v1alpha1_ScheduleTriggerSpec(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerStatus":                       schema_pkg_apis_policy_v1alpha1_ScheduleTriggerStatus(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.SpreadConstraint":                            schema_pkg_apis_policy_v1alpha1_SpreadConstraint(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.StaticClusterAssignment":                     schema_pkg_apis_policy_v1alpha1_StaticClusterAssignment(ref),
 		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.StaticClusterWeight":                         schema_pkg_apis_policy_v1alpha1_StaticClusterWeight(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefPolicy":                             schema_pkg_apis_policy_v1alpha1_TargetRefPolicy(ref),
+		"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefResource":                           schema_pkg_apis_policy_v1alpha1_TargetRefResource(ref),
 		"github.com/karmada-io/karmada/pkg/apis/remedy/v1alpha1.ClusterAffinity":                             schema_pkg_apis_remedy_v1alpha1_ClusterAffinity(ref),
 		"github.com/karmada-io/karmada/pkg/apis/remedy/v1alpha1.ClusterConditionRequirement":                 schema_pkg_apis_remedy_v1alpha1_ClusterConditionRequirement(ref),
 		"github.com/karmada-io/karmada/pkg/apis/remedy/v1alpha1.DecisionMatch":                               schema_pkg_apis_remedy_v1alpha1_DecisionMatch(ref),
@@ -3687,6 +3694,58 @@ func schema_pkg_apis_policy_v1alpha1_DecisionConditions(ref common.ReferenceCall
 	}
 }
 
+func schema_pkg_apis_policy_v1alpha1_FailedResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "FailedResource trigger failed resource and its failure reason.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion represents the API version of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind represents the Kind of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace of the target resource. Default is empty, which means it is a non-namespacescoped resource.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"failReason": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FailReason the reason of resource triggered failed.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"apiVersion", "kind", "name"},
+			},
+		},
+	}
+}
+
 func schema_pkg_apis_policy_v1alpha1_FailoverBehavior(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -4717,6 +4776,199 @@ func schema_pkg_apis_policy_v1alpha1_RuleWithCluster(ref common.ReferenceCallbac
 	}
 }
 
+func schema_pkg_apis_policy_v1alpha1_ScheduleTrigger(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ScheduleTrigger represents the desired behavior and status of a job which can enforces a rescheduling.\n\nNotes: make sure the clocks of controller-manager and scheduler are synchronized when using this API.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec represents the specification of the desired behavior of ScheduleTrigger.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status represents the status of ScheduleTrigger.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerStatus"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerSpec", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTriggerStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_ScheduleTriggerList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ScheduleTriggerList contains a list of ScheduleTrigger",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items holds a list of ScheduleTrigger.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTrigger"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ScheduleTrigger", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_ScheduleTriggerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ScheduleTriggerSpec represents the specification of the desired behavior of Reschedule.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"targetRefPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TargetRefPolicy used to select batch of resources managed by certain policies.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefPolicy"),
+									},
+								},
+							},
+						},
+					},
+					"targetRefResource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TargetRefResource used to select resources.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefResource"),
+									},
+								},
+							},
+						},
+					},
+					"retryAfterSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RetryAfterSeconds specified the time interval in seconds to retry when part of the target resource triggering schedule failed. Defaults to value 3, and value 0 means retry immediately.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"autoCleanAfterSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AutoCleanAfterMinutes specified the time in minutes when to clean up current ScheduleTrigger. When time up, the current object will be deleted, no matter whether executed success. Defaults to value 60, and value 0 means never do auto clean.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefPolicy", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.TargetRefResource"},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_ScheduleTriggerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ScheduleTriggerStatus contains information about the current status of a ScheduleTrigger updated periodically by schedule trigger controller.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"phase": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Phase represents the specific extent to which the task has been executed. Valid options are \"Running\", \"Failed\" and \"Success\", Defaults to \"Running\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"failedResourceList": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FailedResourceList the list of trigger failed resources.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailedResource"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailedResource"},
+	}
+}
+
 func schema_pkg_apis_policy_v1alpha1_SpreadConstraint(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -4825,6 +5077,80 @@ func schema_pkg_apis_policy_v1alpha1_StaticClusterWeight(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.ClusterAffinity"},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_TargetRefPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TargetRefPolicy the resources bound policy will be selected.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the target policy.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace of the target policy. Default is empty, which means it is a cluster propagation policy.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_policy_v1alpha1_TargetRefResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TargetRefResource the resource will be selected.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion represents the API version of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind represents the Kind of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name of the target resource.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Namespace of the target resource. Default is empty, which means it is a non-namespacescoped resource.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"apiVersion", "kind", "name"},
+			},
+		},
 	}
 }
 
@@ -6748,12 +7074,19 @@ func schema_pkg_apis_work_v1alpha2_ResourceBindingSpec(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"rescheduleTriggeredAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RescheduleTriggeredAt is a timestamp representing when the referenced resource is triggered rescheduling. Only when this timestamp is later than timestamp in status.rescheduledAt will the rescheduling actually execute.\n\nIt is represented in RFC3339 form (like '2006-01-02T15:04:05Z') and is in UTC. It is recommended to be populated by the REST handler of command.karmada.io/Reschedule API.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 				Required: []string{"resource"},
 			},
 		},
 		Dependencies: []string{
-			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailoverBehavior", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.Placement", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.BindingSnapshot", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.GracefulEvictionTask", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.ObjectReference", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.ReplicaRequirements", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.TargetCluster"},
+			"github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.FailoverBehavior", "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1.Placement", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.BindingSnapshot", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.GracefulEvictionTask", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.ObjectReference", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.ReplicaRequirements", "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.TargetCluster", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -6776,6 +7109,13 @@ func schema_pkg_apis_work_v1alpha2_ResourceBindingStatus(ref common.ReferenceCal
 							Description: "SchedulerObservedAffinityName is the name of affinity term that is the basis of current scheduling.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"lastScheduledTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastScheduledTime is a timestamp representing scheduler successfully finished a scheduling. It is represented in RFC3339 form (like '2006-01-02T15:04:05Z') and is in UTC.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
 					"conditions": {
@@ -6810,7 +7150,7 @@ func schema_pkg_apis_work_v1alpha2_ResourceBindingStatus(ref common.ReferenceCal
 			},
 		},
 		Dependencies: []string{
-			"github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.AggregatedStatusItem", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
+			"github.com/karmada-io/karmada/pkg/apis/work/v1alpha2.AggregatedStatusItem", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 

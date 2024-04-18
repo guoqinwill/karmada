@@ -49,3 +49,7 @@ type PropagationPolicyListerExpansion interface{}
 // PropagationPolicyNamespaceListerExpansion allows custom methods to be added to
 // PropagationPolicyNamespaceLister.
 type PropagationPolicyNamespaceListerExpansion interface{}
+
+// ScheduleTriggerListerExpansion allows custom methods to be added to
+// ScheduleTriggerLister.
+type ScheduleTriggerListerExpansion interface{}

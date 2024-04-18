@@ -93,6 +93,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1alpha1().OverridePolicies().Informer()}, nil
 	case policyv1alpha1.SchemeGroupVersion.WithResource("propagationpolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1alpha1().PropagationPolicies().Informer()}, nil
+	case policyv1alpha1.SchemeGroupVersion.WithResource("scheduletriggers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Policy().V1alpha1().ScheduleTriggers().Informer()}, nil
 
 		// Group=remedy.karmada.io, Version=v1alpha1
 	case remedyv1alpha1.SchemeGroupVersion.WithResource("remedies"):

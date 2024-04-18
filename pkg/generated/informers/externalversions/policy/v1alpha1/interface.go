@@ -34,6 +34,8 @@ type Interface interface {
 	OverridePolicies() OverridePolicyInformer
 	// PropagationPolicies returns a PropagationPolicyInformer.
 	PropagationPolicies() PropagationPolicyInformer
+	// ScheduleTriggers returns a ScheduleTriggerInformer.
+	ScheduleTriggers() ScheduleTriggerInformer
 }
 
 type version struct {
@@ -70,4 +72,9 @@ func (v *version) OverridePolicies() OverridePolicyInformer {
 // PropagationPolicies returns a PropagationPolicyInformer.
 func (v *version) PropagationPolicies() PropagationPolicyInformer {
 	return &propagationPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ScheduleTriggers returns a ScheduleTriggerInformer.
+func (v *version) ScheduleTriggers() ScheduleTriggerInformer {
+	return &scheduleTriggerInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
